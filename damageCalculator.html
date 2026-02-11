@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoA Damage Calculator</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #2c3e50;
+            --background-color: #f5f6fa;
+            --input-background: #ffffff;
+            --success-color: #4CAF50;
+            --success-dark: #2E7D32;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.3;
+            background-color: var(--background-color);
+            min-height: 100vh;
+            padding-bottom: 80px; /* Space for sticky footer */
+            position: relative;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 10px 16px;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--secondary-color);
+            margin: 8px 0 12px;
+            font-size: 1.5em;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .calculator-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 1400px) {
+            .calculator-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .calculator-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 850px) {
+            .calculator-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .input-group {
+            background: white;
+            padding: 8px 10px;
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .input-group:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .input-wrapper {
+            margin-bottom: 4px;
+        }
+
+        label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+            color: var(--secondary-color);
+            font-weight: 600;
+            font-size: 0.78em;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 6px 8px;
+            border: 2px solid #e9ecef;
+            border-radius: 4px;
+            background-color: var(--input-background);
+            transition: all 0.3s ease;
+            font-size: 12px;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+
+        .modifier-section {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .modifier-label {
+            font-size: 0.7em;
+            color: var(--success-color);
+            font-weight: 600;
+            min-width: 50px;
+        }
+
+        .modifier-input {
+            border-color: var(--success-color);
+            background-color: rgba(76, 175, 80, 0.05);
+        }
+
+        .modifier-input:focus {
+            border-color: var(--success-dark);
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        /* Tooltip styling */
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+            margin-left: 6px;
+            cursor: help;
+        }
+
+        .tooltip-icon {
+            background: var(--secondary-color);
+            color: white;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            background-color: var(--secondary-color);
+            color: white;
+            text-align: center;
+            padding: 6px 10px;
+            border-radius: 4px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-size: 0.8em;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--secondary-color) transparent transparent transparent;
+        }
+
+        .total-value {
+            font-size: 0.72em;
+            color: var(--success-color);
+            margin-top: 2px;
+            font-weight: 600;
+        }
+
+        .actual-attack-display {
+            background: linear-gradient(135deg, var(--secondary-color), #34495e);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .actual-attack-display h3 {
+            margin-bottom: 4px;
+            font-size: 0.95em;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .actual-attack-display .value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #4CAF50;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .actual-attack-display .formula {
+            font-size: 0.72em;
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.7);
+            padding: 3px 6px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .sticky-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, var(--secondary-color), #34495e);
+            padding: 8px 12px;
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .result-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1600px;
+            margin: 0 auto;
+            color: white;
+            gap: 15px;
+        }
+
+        .damage-comparison {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .damage-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .damage-box h3 {
+            font-size: 0.75em;
+            margin-bottom: 3px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .damage-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .damage-increase {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(76, 175, 80, 0.2);
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .defense-group {
+            border: 2px solid var(--secondary-color);
+            border-radius: 8px;
+            padding: 8px;
+            margin-bottom: 0;
+            background: rgba(44, 62, 80, 0.05);
+            grid-column: span 2;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .defense-group-title {
+            color: var(--secondary-color);
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(44, 62, 80, 0.2);
+            grid-column: span 2;
+        }
+
+        .defense-group .input-group {
+            margin-bottom: 0;
+        }
+
+        .defense-group .input-group:last-child {
+            margin-bottom: 0;
+        }
+
+        @media (max-width: 1100px) {
+            .defense-group {
+                grid-column: span 1;
+                grid-template-columns: 1fr;
+            }
+            
+            .defense-group-title {
+                grid-column: span 1;
+            }
+        }
+
+        .arrow-icon {
+            font-size: 1.2em;
+        }
+
+        .result-section h2 {
+            font-size: 1.5em;
+            margin: 0;
+        }
+
+        #finalDamage {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4CAF50;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 8px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85em;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        button:first-of-type {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        button:last-of-type {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        button:first-of-type:hover {
+            background-color: #1a252f;
+        }
+
+        button:last-of-type:hover {
+            background-color: var(--success-dark);
+        }
+
+        .resonance-toggle {
+            background-color: #95a5a6;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            margin-left: 6px;
+            font-size: 0.7em;
+        }
+
+        .resonance-toggle.active {
+            background-color: var(--success-color);
+        }
+
+        @media (max-width: 768px) {
+            .calculator-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .sticky-footer {
+                padding: 8px;
+            }
+
+            .result-section {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+
+            .damage-comparison {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .damage-box {
+                width: 100%;
+            }
+
+            .damage-value {
+                font-size: 20px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+
+        .presets-container {
+            margin-top: 4px;
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .preset-button {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 0.68em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .preset-button:hover {
+            background: #1a252f;
+            transform: translateY(-1px);
+        }
+
+        .preset-value {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-size: 0.85em;
+        }
+
+        /* Gear Management Styles */
+        .gear-section {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .gear-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .gear-header h2 {
+            font-size: 1.2em;
+            color: var(--secondary-color);
+            margin: 0;
+        }
+
+        .add-gear-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .add-gear-btn:hover {
+            background: #3a7bc8;
+            transform: translateY(-1px);
+        }
+
+        .gear-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 10px;
+        }
+
+        .gear-item {
+            background: var(--background-color);
+            padding: 10px;
+            border-radius: 6px;
+            border: 2px solid #e9ecef;
+            transition: all 0.2s ease;
+        }
+
+        .gear-item.equipped {
+            border-color: var(--success-color);
+            background: rgba(76, 175, 80, 0.05);
+        }
+
+        .gear-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .gear-name {
+            font-weight: 600;
+            color: var(--secondary-color);
+            font-size: 0.95em;
+        }
+
+        .gear-equipped-badge {
+            background: var(--success-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+
+        .gear-stats {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 8px;
+            max-height: 60px;
+            overflow-y: auto;
+        }
+
+        .gear-stat-item {
+            margin: 2px 0;
+        }
+
+        .gear-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .gear-btn {
+            flex: 1;
+            padding: 6px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .equip-btn {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .equip-btn:hover {
+            background: var(--success-dark);
+        }
+
+        .unequip-btn {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .unequip-btn:hover {
+            background: #7f8c8d;
+        }
+
+        .edit-btn {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .edit-btn:hover {
+            background: #3a7bc8;
+        }
+
+        .delete-btn {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #c0392b;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: var(--secondary-color);
+            font-size: 1.3em;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #95a5a6;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+        }
+
+        .close-modal:hover {
+            color: #e74c3c;
+        }
+
+        .gear-form-group {
+            margin-bottom: 15px;
+        }
+
+        .gear-form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--secondary-color);
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .gear-form-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 0.9em;
+            transition: border-color 0.3s ease;
+        }
+
+        .gear-form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .gear-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-input-group label {
+            font-size: 0.8em;
+            margin-bottom: 4px;
+            color: #666;
+        }
+
+        .stat-input-group input {
+            padding: 6px 8px;
+            font-size: 0.85em;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .save-gear-btn {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .save-gear-btn:hover {
+            background: var(--success-dark);
+        }
+
+        .cancel-btn {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background: #7f8c8d;
+        }
+
+        .no-gears {
+            text-align: center;
+            padding: 20px;
+            color: #95a5a6;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CoA Damage Calculator</h1>
+        
+        <!-- Gear Management Section -->
+        <div class="gear-section">
+            <div class="gear-header">
+                <h2>⚔️ Gear Management</h2>
+                <button class="add-gear-btn" id="addGearBtn">+ Add Gear</button>
+            </div>
+            <div class="gear-list" id="gearList">
+                <div class="no-gears">No gears created yet. Click "Add Gear" to create one!</div>
+            </div>
+        </div>
+
+        <div class="actual-attack-display">
+            <h3>Actual Attack</h3>
+            <div class="value" id="actualAttack">0</div>
+            <div class="formula">= Total ATK × (1 - Damage Reduction %) + DEF Shred</div>
+        </div>
+
+        <div class="calculator-grid">
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="totalPatk">Total ATK</label>
+                    <input type="number" id="totalPatk" value="1000" min="0">
+                    <div class="total-value" id="totalPatk_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="totalPatk_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="defense-group">
+                <div class="defense-group-title">Defense & Penetration</div>
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <label for="damageReduction">Damage Reduction (%)
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text" id="defenseTooltip">Base Defense: 0</span>
+                            </div>
+                        </label>
+                        <input type="number" id="damageReduction" value="0" min="0" max="100">
+                        <div class="total-value" id="damageReduction_total"></div>
+                        <div class="presets-container">
+                            <button class="preset-button" onclick="setDamageReduction(62.84)">
+                                HexChess King
+                                <span class="preset-value">62.84%</span>
+                            </button>
+                            <button class="preset-button" onclick="setDamageReduction(51.26)">
+                                GoldenFleece Boss
+                                <span class="preset-value">51.26%</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <label for="physicalPen">Physical PEN (%)
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text" id="penTooltip">Effective Defense: 0<br>Final Reduction: 0%</span>
+                            </div>
+                        </label>
+                        <input type="number" id="physicalPen" value="0" min="0" max="100">
+                        <div class="total-value" id="physicalPen_total"></div>
+                    </div>
+                    <div class="modifier-section">
+                        <span class="modifier-label">Increase:</span>
+                        <input type="number" class="modifier-input" id="physicalPen_mod" value="0" placeholder="+/-">
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="pdefShred">DEF Shred</label>
+                    <input type="number" id="pdefShred" value="0" min="0">
+                    <div class="total-value" id="pdefShred_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="pdefShred_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="skillMultiplier">Skill Multiplier (%)
+                        <div class="tooltip-container">
+                            <div class="tooltip-icon">?</div>
+                            <span class="tooltip-text">Input the skill multiplier value from one of your skills</span>
+                        </div>
+                    </label>
+                    <input type="number" id="skillMultiplier" value="100" min="0">
+                    <div class="total-value" id="skillMultiplier_total"></div>
+                </div>
+
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="critDmg">Critical Damage (%)</label>
+                    <input type="number" id="critDmg" value="150" min="0">
+                    <div class="total-value" id="critDmg_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="critDmg_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="elementalEnh">Elemental ENH</label>
+                    <input type="number" id="elementalEnh" value="0" min="0">
+                    <div class="total-value" id="elementalEnh_total"></div>
+                    <div id="elementalDmgDisplay"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="elementalEnh_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="skillDmg">Skill DMG (%)</label>
+                    <input type="number" id="skillDmg" value="0" min="0">
+                    <div class="total-value" id="skillDmg_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="skillDmg_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgBonus">DMG Bonus (%)</label>
+                    <input type="number" id="dmgBonus" value="0" min="0">
+                    <div class="total-value" id="dmgBonus_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgBonus_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <!-- Damage during Resonance -->
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgDuringResonance">Damage during Resonance (%)
+                        <button type="button" id="resonanceToggle" class="resonance-toggle">Inactive</button>
+                    </label>
+                    <input type="number" id="dmgDuringResonance" value="0" min="0">
+                    <div class="total-value" id="dmgDuringResonance_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgDuringResonance_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToBoss">DMG to Bosses (%)</label>
+                    <input type="number" id="dmgToBoss" value="0" min="0">
+                    <div class="total-value" id="dmgToBoss_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToBoss_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToBeast">DMG to Beast (%)</label>
+                    <input type="number" id="dmgToBeast" value="0" min="0">
+                    <div class="total-value" id="dmgToBeast_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToBeast_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToMech">DMG to Mech (%)</label>
+                    <input type="number" id="dmgToMech" value="0" min="0">
+                    <div class="total-value" id="dmgToMech_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToMech_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToDecayed">DMG to Decayed (%)</label>
+                    <input type="number" id="dmgToDecayed" value="0" min="0">
+                    <div class="total-value" id="dmgToDecayed_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToDecayed_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToOtherworld">DMG to Otherworld (%)</label>
+                    <input type="number" id="dmgToOtherworld" value="0" min="0">
+                    <div class="total-value" id="dmgToOtherworld_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToOtherworld_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToDebuffed">DMG to Debuffed (%)</label>
+                    <input type="number" id="dmgToDebuffed" value="0" min="0">
+                    <div class="total-value" id="dmgToDebuffed_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToDebuffed_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToScorched">DMG to Scorched (%)</label>
+                    <input type="number" id="dmgToScorched" value="0" min="0">
+                    <div class="total-value" id="dmgToScorched_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToScorched_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToPoisoned">DMG to Poisoned (%)</label>
+                    <input type="number" id="dmgToPoisoned" value="0" min="0">
+                    <div class="total-value" id="dmgToPoisoned_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToPoisoned_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToBleeding">DMG to Bleeding (%)</label>
+                    <input type="number" id="dmgToBleeding" value="0" min="0">
+                    <div class="total-value" id="dmgToBleeding_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToBleeding_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToVulnerable">DMG to Vulnerable (%)</label>
+                    <input type="number" id="dmgToVulnerable" value="0" min="0">
+                    <div class="total-value" id="dmgToVulnerable_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToVulnerable_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToSlowed">DMG to Slowed (%)</label>
+                    <input type="number" id="dmgToSlowed" value="0" min="0">
+                    <div class="total-value" id="dmgToSlowed_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToSlowed_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="dmgToExhausted">DMG to Exhausted (%)</label>
+                    <input type="number" id="dmgToExhausted" value="0" min="0">
+                    <div class="total-value" id="dmgToExhausted_total"></div>
+                </div>
+                <div class="modifier-section">
+                    <span class="modifier-label">Increase:</span>
+                    <input type="number" class="modifier-input" id="dmgToExhausted_mod" value="0" placeholder="+/-">
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="resetButton">Reset to Defaults</button>
+            <button id="resetModifiersButton">Reset Increase</button>
+        </div>
+    </div>
+
+    <div class="sticky-footer">
+        <div class="result-section">
+            <h2>Final Damage</h2>
+            <div class="damage-comparison">
+                <div class="damage-box">
+                    <h3>Skill Damage Output</h3>
+                    <div class="damage-value" id="baseDamage">0</div>
+                </div>
+                <div class="damage-box" id="modifiedDamageBox" style="display: none;">
+                    <h3>With Increases</h3>
+                    <div class="damage-value" id="finalDamage">0</div>
+                </div>
+                <div class="damage-increase" id="damageIncrease" style="display: none;">
+                    <span class="arrow-icon">→</span>
+                    <span id="increasePercentage">0%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gear Modal -->
+    <div id="gearModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Gear</h2>
+                <button class="close-modal" id="closeModal">&times;</button>
+            </div>
+            <form id="gearForm">
+                <div class="gear-form-group">
+                    <label for="gearName">Gear Name *</label>
+                    <input type="text" id="gearName" required placeholder="e.g., Legendary Sword">
+                </div>
+                <div class="gear-form-group">
+                    <label>Gear Stats (leave 0 if not applicable)</label>
+                    <div class="gear-stats-grid">
+                        <div class="stat-input-group">
+                            <label for="gear_totalPatk">Total ATK</label>
+                            <input type="number" id="gear_totalPatk" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_physicalPen">Physical PEN (%)</label>
+                            <input type="number" id="gear_physicalPen" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_pdefShred">DEF Shred</label>
+                            <input type="number" id="gear_pdefShred" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_critDmg">Critical Damage (%)</label>
+                            <input type="number" id="gear_critDmg" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_elementalEnh">Elemental ENH</label>
+                            <input type="number" id="gear_elementalEnh" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_skillDmg">Skill DMG (%)</label>
+                            <input type="number" id="gear_skillDmg" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgBonus">DMG Bonus (%)</label>
+                            <input type="number" id="gear_dmgBonus" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgDuringResonance">DMG during Resonance (%)</label>
+                            <input type="number" id="gear_dmgDuringResonance" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToBoss">DMG to Bosses (%)</label>
+                            <input type="number" id="gear_dmgToBoss" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToBeast">DMG to Beast (%)</label>
+                            <input type="number" id="gear_dmgToBeast" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToMech">DMG to Mech (%)</label>
+                            <input type="number" id="gear_dmgToMech" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToDecayed">DMG to Decayed (%)</label>
+                            <input type="number" id="gear_dmgToDecayed" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToOtherworld">DMG to Otherworld (%)</label>
+                            <input type="number" id="gear_dmgToOtherworld" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToDebuffed">DMG to Debuffed (%)</label>
+                            <input type="number" id="gear_dmgToDebuffed" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToScorched">DMG to Scorched (%)</label>
+                            <input type="number" id="gear_dmgToScorched" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToPoisoned">DMG to Poisoned (%)</label>
+                            <input type="number" id="gear_dmgToPoisoned" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToBleeding">DMG to Bleeding (%)</label>
+                            <input type="number" id="gear_dmgToBleeding" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToVulnerable">DMG to Vulnerable (%)</label>
+                            <input type="number" id="gear_dmgToVulnerable" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToSlowed">DMG to Slowed (%)</label>
+                            <input type="number" id="gear_dmgToSlowed" value="0">
+                        </div>
+                        <div class="stat-input-group">
+                            <label for="gear_dmgToExhausted">DMG to Exhausted (%)</label>
+                            <input type="number" id="gear_dmgToExhausted" value="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn cancel-btn" id="cancelModal">Cancel</button>
+                    <button type="submit" class="modal-btn save-gear-btn">Save Gear</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Get all input elements
+        const inputs = document.querySelectorAll('input[type="number"]');
+        const baseInputs = document.querySelectorAll('input[type="number"]:not(.modifier-input)');
+        const modifierInputs = document.querySelectorAll('.modifier-input');
+
+        // Add event listeners to all inputs
+        inputs.forEach(input => {
+            input.addEventListener('input', (e) => {
+                calculateDamage();
+                // Only save base values to localStorage
+                if (!input.classList.contains('modifier-input')) {
+                    localStorage.setItem(input.id, input.value);
+                }
+            });
+
+            // Load saved value from localStorage on page load (only for base inputs)
+            if (!input.classList.contains('modifier-input')) {
+                const savedValue = localStorage.getItem(input.id);
+                if (savedValue !== null) {
+                    input.value = savedValue;
+                }
+            }
+        });
+
+        // Add event listeners specifically for modifier inputs to default to 0 when empty
+        modifierInputs.forEach(input => {
+            input.addEventListener('blur', (e) => {
+                if (e.target.value === '' || e.target.value === null) {
+                    e.target.value = 0;
+                    calculateDamage();
+                }
+            });
+        });
+
+        // Resonance toggle state
+        let resonanceActive = (localStorage.getItem('resonanceActive') === 'true');
+
+        function updateResonanceToggleUI() {
+            const btn = document.getElementById('resonanceToggle');
+            if (!btn) return;
+            if (resonanceActive) {
+                btn.classList.add('active');
+                btn.textContent = 'Active';
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = 'Inactive';
+            }
+        }
+
+        // Attach toggle listener immediately (script is at end of body)
+        const resonanceToggleBtn = document.getElementById('resonanceToggle');
+        if (resonanceToggleBtn) {
+            resonanceToggleBtn.addEventListener('click', () => {
+                resonanceActive = !resonanceActive;
+                localStorage.setItem('resonanceActive', String(resonanceActive));
+                updateResonanceToggleUI();
+                calculateDamage();
+            });
+            updateResonanceToggleUI();
+        }
+
+        // Function to get total value (base + modifier)
+        function getTotalValue(baseId) {
+            const baseValue = parseFloat(document.getElementById(baseId).value) || 0;
+            const modifierElement = document.getElementById(baseId + '_mod');
+            const modValue = modifierElement ? (parseFloat(modifierElement.value) || 0) : 0;
+            const total = baseValue + modValue;
+            
+            // Update total display
+            const totalDisplay = document.getElementById(baseId + '_total');
+            if (totalDisplay) {
+                if (modValue !== 0) {
+                    totalDisplay.textContent = `Total: ${total}`;
+                } else {
+                    totalDisplay.textContent = '';
+                }
+            }
+            
+            return total;
+        }
+
+        // Replace the existing button creation code with these event listeners
+        document.getElementById('resetButton').addEventListener('click', () => {
+            if (confirm('Are you sure you want to reset all values to defaults?')) {
+                localStorage.clear();
+                baseInputs.forEach(input => {
+                    input.value = input.defaultValue;
+                });
+                modifierInputs.forEach(input => {
+                    input.value = 0;
+                });
+                calculateDamage();
+            }
+        });
+
+        document.getElementById('resetModifiersButton').addEventListener('click', () => {
+            modifierInputs.forEach(input => {
+                input.value = 0;
+            });
+            calculateDamage();
+        });
+
+        function calculateDamage() {
+            // Calculate base values (without modifiers)
+            const basePatk = parseFloat(document.getElementById('totalPatk').value) || 0;
+            const baseDamageReduction = parseFloat(document.getElementById('damageReduction').value) / 100 || 0;
+            const basePhysicalPen = parseFloat(document.getElementById('physicalPen').value) / 100 || 0;
+            
+            // Calculate defense value from damage reduction
+            const calculateDefense = (damageReduction) => {
+                return Math.round((3000 * damageReduction) / (1 - damageReduction));
+            };
+
+            // Calculate damage reduction from defense and pen
+            const calculateDamageReduction = (defense, pen) => {
+                const effectiveDefense = defense * (1 - pen);
+                return effectiveDefense / (3000 + effectiveDefense);
+            };
+            
+            // Calculate base defense and effective defense
+            const baseDefense = calculateDefense(baseDamageReduction);
+            const effectiveDefense = Math.round(baseDefense * (1 - basePhysicalPen));
+            const actualDamageReduction = calculateDamageReduction(baseDefense, basePhysicalPen);
+            
+            // Update tooltips
+            document.getElementById('defenseTooltip').textContent = 
+                `Base Defense: ${baseDefense.toLocaleString()}`;
+            
+            document.getElementById('penTooltip').textContent = 
+                `Effective Defense: ${effectiveDefense.toLocaleString()}\nFinal Reduction: ${(actualDamageReduction * 100).toFixed(2)}%`;
+            
+            const basePdefShred = parseFloat(document.getElementById('pdefShred').value) || 0;
+            const baseActualAtk = basePatk * (1 - actualDamageReduction) + basePdefShred;
+
+            // Calculate base damage
+            const baseSkillMultiplier = parseFloat(document.getElementById('skillMultiplier').value) / 100 || 0;
+            const baseCritDmg = parseFloat(document.getElementById('critDmg').value) / 100 || 0;
+            const baseElementalEnh = parseFloat(document.getElementById('elementalEnh').value) || 0;
+            const baseElementalDmg = (baseElementalEnh / 11) * 0.05;
+            
+            const baseSkillDmg = parseFloat(document.getElementById('skillDmg').value) / 100 || 0;
+            const baseDmgBonus = parseFloat(document.getElementById('dmgBonus').value) / 100 || 0;
+            const baseDmgToBoss = parseFloat(document.getElementById('dmgToBoss').value) / 100 || 0;
+            const baseDmgToBeast = parseFloat(document.getElementById('dmgToBeast').value) / 100 || 0;
+            const baseDmgToMech = parseFloat(document.getElementById('dmgToMech').value) / 100 || 0;
+            const baseDmgToDecayed = parseFloat(document.getElementById('dmgToDecayed').value) / 100 || 0;
+            const baseDmgToOtherworld = parseFloat(document.getElementById('dmgToOtherworld').value) / 100 || 0;
+            const baseDmgToDebuffed = parseFloat(document.getElementById('dmgToDebuffed').value) / 100 || 0;
+            const baseDmgToScorched = parseFloat(document.getElementById('dmgToScorched').value) / 100 || 0;
+            const baseDmgToPoisoned = parseFloat(document.getElementById('dmgToPoisoned').value) / 100 || 0;
+            const baseDmgToBleeding = parseFloat(document.getElementById('dmgToBleeding').value) / 100 || 0;
+            const baseDmgToVulnerable = parseFloat(document.getElementById('dmgToVulnerable').value) / 100 || 0;
+            const baseDmgToSlowed = parseFloat(document.getElementById('dmgToSlowed').value) / 100 || 0;
+            const baseDmgToExhausted = parseFloat(document.getElementById('dmgToExhausted').value) / 100 || 0;
+
+            // Calculate base damage (Damage to X are additive with each other)
+            const baseDmgToX = baseDmgToBoss + baseDmgToBeast + baseDmgToMech + baseDmgToDecayed + 
+                             baseDmgToOtherworld + baseDmgToDebuffed + baseDmgToScorched + baseDmgToPoisoned + 
+                             baseDmgToBleeding + baseDmgToVulnerable + baseDmgToSlowed + baseDmgToExhausted;
+            const baseDmgDuringResonance = (parseFloat(document.getElementById('dmgDuringResonance')?.value) || 0) / 100;
+            const baseResonanceFactor = resonanceActive ? (1 + 0.20 + baseDmgDuringResonance) : 1;
+            const baseDamage = baseActualAtk *
+                            (1 + baseSkillMultiplier) *
+                            (1 + baseCritDmg) *
+                            (1 + baseElementalDmg) *
+                            (1 + baseSkillDmg) *
+                            (1 + baseDmgBonus) *
+                            (1 + baseDmgToX) *
+                            baseResonanceFactor;
+
+            // Calculate with modifiers
+            const totalPatk = getTotalValue('totalPatk');
+            const totalDamageReduction = getTotalValue('damageReduction') / 100;
+            const totalPhysicalPen = getTotalValue('physicalPen') / 100;
+            
+            // Calculate total defense and effective defense with modifiers
+            const totalDefense = calculateDefense(totalDamageReduction);
+            const totalEffectiveDefense = totalDefense * (1 - totalPhysicalPen);
+            const totalDamageReductionAfterPen = totalEffectiveDefense / (3000 + totalEffectiveDefense);
+            
+            const pdefShred = getTotalValue('pdefShred');
+            const actualAtk = totalPatk * (1 - totalDamageReductionAfterPen) + pdefShred;
+
+            document.getElementById('actualAttack').textContent = Math.round(actualAtk).toLocaleString();
+
+            const skillMultiplier = getTotalValue('skillMultiplier') / 100;
+            const critDmg = getTotalValue('critDmg') / 100;
+            const elementalEnh = getTotalValue('elementalEnh');
+            const elementalDmg = (elementalEnh / 11) * 0.05;
+            
+            document.getElementById('elementalDmgDisplay').textContent = 
+                `Converted to: ${(elementalDmg * 100).toFixed(2)}% Elemental DMG`;
+            
+            const skillDmg = getTotalValue('skillDmg') / 100;
+            const dmgBonus = getTotalValue('dmgBonus') / 100;
+            const dmgToBoss = getTotalValue('dmgToBoss') / 100;
+            const dmgToBeast = getTotalValue('dmgToBeast') / 100;
+            const dmgToMech = getTotalValue('dmgToMech') / 100;
+            const dmgToDecayed = getTotalValue('dmgToDecayed') / 100;
+            const dmgToOtherworld = getTotalValue('dmgToOtherworld') / 100;
+            const dmgToDebuffed = getTotalValue('dmgToDebuffed') / 100;
+            const dmgToScorched = getTotalValue('dmgToScorched') / 100;
+            const dmgToPoisoned = getTotalValue('dmgToPoisoned') / 100;
+            const dmgToBleeding = getTotalValue('dmgToBleeding') / 100;
+            const dmgToVulnerable = getTotalValue('dmgToVulnerable') / 100;
+            const dmgToSlowed = getTotalValue('dmgToSlowed') / 100;
+            const dmgToExhausted = getTotalValue('dmgToExhausted') / 100;
+
+            // Calculate final damage with modifiers (Damage to X are additive with each other)
+            const dmgToX = dmgToBoss + dmgToBeast + dmgToMech + dmgToDecayed + 
+                         dmgToOtherworld + dmgToDebuffed + dmgToScorched + dmgToPoisoned + 
+                         dmgToBleeding + dmgToVulnerable + dmgToSlowed + dmgToExhausted;
+            const dmgDuringResonance = (getTotalValue('dmgDuringResonance') || 0) / 100;
+            const resonanceFactor = resonanceActive ? (1 + 0.20 + dmgDuringResonance) : 1;
+            const finalDamage = actualAtk *
+                            (1 + skillMultiplier) *
+                            (1 + critDmg) *
+                            (1 + elementalDmg) *
+                            (1 + skillDmg) *
+                            (1 + dmgBonus) * 
+                            (1 + dmgToX) *
+                            resonanceFactor;
+
+            // Display base damage
+            document.getElementById('baseDamage').textContent = Math.round(baseDamage).toLocaleString();
+
+            // Check if any modifiers are non-zero
+            const hasModifiers = [...modifierInputs].some(input => parseFloat(input.value) !== 0);
+
+            // Show/hide modified damage and increase percentage
+            const modifiedDamageBox = document.getElementById('modifiedDamageBox');
+            const damageIncrease = document.getElementById('damageIncrease');
+
+            if (hasModifiers) {
+                modifiedDamageBox.style.display = 'block';
+                damageIncrease.style.display = 'flex';
+                document.getElementById('finalDamage').textContent = Math.round(finalDamage).toLocaleString();
+                
+                // Calculate and display percentage increase
+                const percentageIncrease = ((finalDamage - baseDamage) / baseDamage * 100).toFixed(2);
+                document.getElementById('increasePercentage').textContent = `+${percentageIncrease}%`;
+            } else {
+                modifiedDamageBox.style.display = 'none';
+                damageIncrease.style.display = 'none';
+            }
+        }
+
+        // Add function to set damage reduction presets
+        function setDamageReduction(value) {
+            const damageReductionInput = document.getElementById('damageReduction');
+            damageReductionInput.value = value;
+            calculateDamage();
+            // Save to localStorage
+            localStorage.setItem('damageReduction', value);
+        }
+
+        // Calculate initial damage
+        calculateDamage();
+
+        // ==================== GEAR MANAGEMENT SYSTEM ====================
+        
+        // Gear state management
+        let gears = JSON.parse(localStorage.getItem('gears')) || [];
+        let equippedGears = JSON.parse(localStorage.getItem('equippedGears')) || [];
+        let editingGearId = null;
+
+        // Stats that can be added by gear
+        const gearStats = [
+            'totalPatk', 'physicalPen', 'pdefShred', 'critDmg', 'elementalEnh',
+            'skillDmg', 'dmgBonus', 'dmgDuringResonance', 'dmgToBoss', 'dmgToBeast',
+            'dmgToMech', 'dmgToDecayed', 'dmgToOtherworld', 'dmgToDebuffed',
+            'dmgToScorched', 'dmgToPoisoned', 'dmgToBleeding', 'dmgToVulnerable',
+            'dmgToSlowed', 'dmgToExhausted'
+        ];
+
+        // Modal controls
+        const modal = document.getElementById('gearModal');
+        const addGearBtn = document.getElementById('addGearBtn');
+        const closeModalBtn = document.getElementById('closeModal');
+        const cancelModalBtn = document.getElementById('cancelModal');
+        const gearForm = document.getElementById('gearForm');
+        const modalTitle = document.getElementById('modalTitle');
+
+        // Open modal
+        addGearBtn.addEventListener('click', () => {
+            editingGearId = null;
+            modalTitle.textContent = 'Add New Gear';
+            gearForm.reset();
+            modal.classList.add('active');
+        });
+
+        // Close modal
+        function closeModal() {
+            modal.classList.remove('active');
+            gearForm.reset();
+            editingGearId = null;
+        }
+
+        closeModalBtn.addEventListener('click', closeModal);
+        cancelModalBtn.addEventListener('click', closeModal);
+
+        // Save gear
+        gearForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const gearName = document.getElementById('gearName').value.trim();
+            if (!gearName) {
+                alert('Please enter a gear name');
+                return;
+            }
+
+            const gearData = {
+                id: editingGearId || Date.now().toString(),
+                name: gearName,
+                stats: {}
+            };
+
+            // Collect all gear stats
+            gearStats.forEach(stat => {
+                const value = parseFloat(document.getElementById(`gear_${stat}`).value) || 0;
+                if (value !== 0) {
+                    gearData.stats[stat] = value;
+                }
+            });
+
+            if (editingGearId) {
+                // Update existing gear
+                const index = gears.findIndex(g => g.id === editingGearId);
+                if (index !== -1) {
+                    // If gear is equipped, unequip it first, then update, then re-equip
+                    const wasEquipped = equippedGears.includes(editingGearId);
+                    if (wasEquipped) {
+                        unequipGear(editingGearId);
+                    }
+                    gears[index] = gearData;
+                    if (wasEquipped) {
+                        equipGear(gearData.id);
+                    }
+                }
+            } else {
+                // Add new gear
+                gears.push(gearData);
+            }
+
+            localStorage.setItem('gears', JSON.stringify(gears));
+            renderGearList();
+            closeModal();
+        });
+
+        // Render gear list
+        function renderGearList() {
+            const gearList = document.getElementById('gearList');
+            
+            if (gears.length === 0) {
+                gearList.innerHTML = '<div class="no-gears">No gears created yet. Click "Add Gear" to create one!</div>';
+                return;
+            }
+
+            gearList.innerHTML = gears.map(gear => {
+                const isEquipped = equippedGears.includes(gear.id);
+                const statsList = Object.entries(gear.stats)
+                    .filter(([_, value]) => value !== 0)
+                    .map(([stat, value]) => {
+                        const label = getStatLabel(stat);
+                        return `<div class="gear-stat-item">• ${label}: ${value > 0 ? '+' : ''}${value}</div>`;
+                    })
+                    .join('');
+
+                return `
+                    <div class="gear-item ${isEquipped ? 'equipped' : ''}" data-gear-id="${gear.id}">
+                        <div class="gear-item-header">
+                            <span class="gear-name">${gear.name}</span>
+                            ${isEquipped ? '<span class="gear-equipped-badge">EQUIPPED</span>' : ''}
+                        </div>
+                        <div class="gear-stats">
+                            ${statsList || '<div class="gear-stat-item">No stats added</div>'}
+                        </div>
+                        <div class="gear-actions">
+                            ${isEquipped 
+                                ? `<button class="gear-btn unequip-btn" onclick="unequipGear('${gear.id}')">Unequip</button>`
+                                : `<button class="gear-btn equip-btn" onclick="equipGear('${gear.id}')">Equip</button>`
+                            }
+                            <button class="gear-btn edit-btn" onclick="editGear('${gear.id}')">Edit</button>
+                            <button class="gear-btn delete-btn" onclick="deleteGear('${gear.id}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Get stat label for display
+        function getStatLabel(stat) {
+            const labels = {
+                'totalPatk': 'Total ATK',
+                'physicalPen': 'Physical PEN %',
+                'pdefShred': 'DEF Shred',
+                'critDmg': 'Crit DMG %',
+                'elementalEnh': 'Elemental ENH',
+                'skillDmg': 'Skill DMG %',
+                'dmgBonus': 'DMG Bonus %',
+                'dmgDuringResonance': 'DMG during Resonance %',
+                'dmgToBoss': 'DMG to Bosses %',
+                'dmgToBeast': 'DMG to Beast %',
+                'dmgToMech': 'DMG to Mech %',
+                'dmgToDecayed': 'DMG to Decayed %',
+                'dmgToOtherworld': 'DMG to Otherworld %',
+                'dmgToDebuffed': 'DMG to Debuffed %',
+                'dmgToScorched': 'DMG to Scorched %',
+                'dmgToPoisoned': 'DMG to Poisoned %',
+                'dmgToBleeding': 'DMG to Bleeding %',
+                'dmgToVulnerable': 'DMG to Vulnerable %',
+                'dmgToSlowed': 'DMG to Slowed %',
+                'dmgToExhausted': 'DMG to Exhausted %'
+            };
+            return labels[stat] || stat;
+        }
+
+        // Equip gear
+        function equipGear(gearId) {
+            if (equippedGears.includes(gearId)) return;
+            
+            const gear = gears.find(g => g.id === gearId);
+            if (!gear) return;
+
+            // Add gear stats to modifier inputs
+            Object.entries(gear.stats).forEach(([stat, value]) => {
+                const modInput = document.getElementById(`${stat}_mod`);
+                if (modInput) {
+                    const currentValue = parseFloat(modInput.value) || 0;
+                    modInput.value = currentValue + value;
+                }
+            });
+
+            equippedGears.push(gearId);
+            localStorage.setItem('equippedGears', JSON.stringify(equippedGears));
+            renderGearList();
+            calculateDamage();
+        }
+
+        // Unequip gear
+        function unequipGear(gearId) {
+            if (!equippedGears.includes(gearId)) return;
+            
+            const gear = gears.find(g => g.id === gearId);
+            if (!gear) return;
+
+            // Remove gear stats from modifier inputs
+            Object.entries(gear.stats).forEach(([stat, value]) => {
+                const modInput = document.getElementById(`${stat}_mod`);
+                if (modInput) {
+                    const currentValue = parseFloat(modInput.value) || 0;
+                    modInput.value = currentValue - value;
+                }
+            });
+
+            equippedGears = equippedGears.filter(id => id !== gearId);
+            localStorage.setItem('equippedGears', JSON.stringify(equippedGears));
+            renderGearList();
+            calculateDamage();
+        }
+
+        // Edit gear
+        function editGear(gearId) {
+            const gear = gears.find(g => g.id === gearId);
+            if (!gear) return;
+
+            editingGearId = gearId;
+            modalTitle.textContent = 'Edit Gear';
+            
+            // Fill form with gear data
+            document.getElementById('gearName').value = gear.name;
+            gearStats.forEach(stat => {
+                const input = document.getElementById(`gear_${stat}`);
+                if (input) {
+                    input.value = gear.stats[stat] || 0;
+                }
+            });
+
+            modal.classList.add('active');
+        }
+
+        // Delete gear
+        function deleteGear(gearId) {
+            if (!confirm('Are you sure you want to delete this gear?')) return;
+            
+            // Unequip if equipped
+            if (equippedGears.includes(gearId)) {
+                unequipGear(gearId);
+            }
+
+            gears = gears.filter(g => g.id !== gearId);
+            localStorage.setItem('gears', JSON.stringify(gears));
+            renderGearList();
+        }
+
+        // Make functions global so they can be called from HTML onclick
+        window.equipGear = equipGear;
+        window.unequipGear = unequipGear;
+        window.editGear = editGear;
+        window.deleteGear = deleteGear;
+
+        // Initialize gear list on page load
+        renderGearList();
+
+        // Re-apply equipped gears on page load (calculate total from all equipped gears)
+        const gearModifiers = {};
+        equippedGears.forEach(gearId => {
+            const gear = gears.find(g => g.id === gearId);
+            if (gear) {
+                Object.entries(gear.stats).forEach(([stat, value]) => {
+                    gearModifiers[stat] = (gearModifiers[stat] || 0) + value;
+                });
+            }
+        });
+
+        // Apply all gear modifiers to the modifier inputs
+        Object.entries(gearModifiers).forEach(([stat, value]) => {
+            const modInput = document.getElementById(`${stat}_mod`);
+            if (modInput) {
+                modInput.value = value;
+            }
+        });
+
+        // Trigger initial calculation with gear stats
+        if (Object.keys(gearModifiers).length > 0) {
+            calculateDamage();
+        }
+    </script>
+</body>
+</html>
