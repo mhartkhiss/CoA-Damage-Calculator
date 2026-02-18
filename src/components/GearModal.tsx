@@ -19,7 +19,7 @@ const gearStatsList = [
   'skillDmg', 'dmgBonus', 'dmgDuringResonance', 'dmgToBoss', 'dmgToBeast',
   'dmgToMech', 'dmgToDecayed', 'dmgToOtherworld', 'dmgToDebuffed',
   'dmgToScorched', 'dmgToPoisoned', 'dmgToBleeding', 'dmgToVulnerable',
-  'dmgToSlowed', 'dmgToExhausted'
+  'dmgToSlowed', 'dmgToExhausted', 'additionalDmg'
 ];
 
 const slotLabels: Record<GearSlot, string> = {
@@ -60,7 +60,8 @@ const statLabels: Record<string, string> = {
   'dmgToBleeding': 'DMG to Bleeding (%)',
   'dmgToVulnerable': 'DMG to Vulnerable (%)',
   'dmgToSlowed': 'DMG to Slowed (%)',
-  'dmgToExhausted': 'DMG to Exhausted (%)'
+  'dmgToExhausted': 'DMG to Exhausted (%)',
+  'additionalDmg': 'Additional DMG (%)'
 };
 
 const GearModal: React.FC<GearModalProps> = ({

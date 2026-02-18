@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaEdit, FaTrash } from 'react-icons/fa';
-import type { Gear, GearSlot, CalculatorInputs, CalculationResults, OtherStat, Preset, DialogConfig } from '../types';
+import type { Gear, GearSlot, CalculatorInputs, CalculationResults, OtherStat, Preset, DialogConfig, EquippedGearSlots, EquippedOtherStatSlots } from '../types';
+import { countEquippedGears } from '../types';
 
 import GearModal from './GearModal';
 import OtherStatModal from './OtherStatModal';
@@ -25,18 +26,19 @@ const gearSlots: GearSlot[] = [
 
 interface GearManagementProps {
   gears: Gear[];
-  equippedGears: string[];
+  equippedGears: EquippedGearSlots;
   otherStats: OtherStat[];
-  equippedOtherStats: string[];
+  equippedOtherStats: EquippedOtherStatSlots;
+  gearBaseContributions: Record<string, number>;
   onAddGear: (gear: Omit<Gear, 'id'>) => void;
   onEditGear: (gearId: string, updates: Omit<Gear, 'id'>) => void;
   onDeleteGear: (gearId: string) => void;
-  onEquipGear: (gearId: string) => void;
+  onEquipGear: (gearId: string, subSlot: 'base' | 'secondary') => void;
   onUnequipGear: (gearId: string) => void;
   onAddOtherStat: (otherStat: Omit<OtherStat, 'id'>) => void;
   onEditOtherStat: (otherStatId: string, updates: Omit<OtherStat, 'id'>) => void;
   onDeleteOtherStat: (otherStatId: string) => void;
-  onEquipOtherStat: (otherStatId: string) => void;
+  onEquipOtherStat: (otherStatId: string, subSlot: 'base' | 'secondary') => void;
   onUnequipOtherStat: (otherStatId: string) => void;
   onUnequipAllOtherStats: () => void;
   inputs: CalculatorInputs;
@@ -100,7 +102,8 @@ const statLabels: Record<string, string> = {
   'dmgToBleeding': 'DMG to Bleeding %',
   'dmgToVulnerable': 'DMG to Vulnerable %',
   'dmgToSlowed': 'DMG to Slowed %',
-  'dmgToExhausted': 'DMG to Exhausted %'
+  'dmgToExhausted': 'DMG to Exhausted %',
+  'additionalDmg': 'Additional DMG %'
 };
 
 const GearManagement: React.FC<GearManagementProps> = ({
@@ -108,6 +111,7 @@ const GearManagement: React.FC<GearManagementProps> = ({
   equippedGears,
   otherStats,
   equippedOtherStats,
+  gearBaseContributions,
   onAddGear,
   onEditGear,
   onDeleteGear,
@@ -187,13 +191,21 @@ const GearManagement: React.FC<GearManagementProps> = ({
     setIsSlotModalOpen(true);
   };
 
-  const getEquippedGearForSlot = (slot: GearSlot): Gear | null => {
-    const gearsToSearch = Array.isArray(equippedGears) ? equippedGears : [];
-    const equippedGearId = gearsToSearch.find((gearId: string) => {
-      const gear = (gears || []).find(g => g.id === gearId);
-      return gear && gear.slot === slot;
-    });
-    return equippedGearId ? (gears || []).find(g => g.id === equippedGearId) || null : null;
+  const getEquippedGearForSubSlot = (slot: GearSlot, subSlot: 'base' | 'secondary'): Gear | null => {
+    const slotData = equippedGears[slot];
+    if (!slotData) return null;
+    const gearId = subSlot === 'base' ? slotData.base : slotData.secondary;
+    if (!gearId) return null;
+    return (gears || []).find(g => g.id === gearId) || null;
+  };
+
+  const getGearSubSlot = (gearId: string): 'base' | 'secondary' | null => {
+    for (const slot in equippedGears) {
+      const slotData = equippedGears[slot as GearSlot];
+      if (slotData?.base === gearId) return 'base';
+      if (slotData?.secondary === gearId) return 'secondary';
+    }
+    return null;
   };
 
   const getGearsForSlot = (slot: GearSlot): Gear[] => {
@@ -206,7 +218,10 @@ const GearManagement: React.FC<GearManagementProps> = ({
       return totalValues.baseAtk_calculated;
     }
 
-    const baseValue = getBaseValue(key);
+    // Display value includes gear base contributions (merged into base, no green/red)
+    const rawBase = getBaseValue(key);
+    const gearBase = gearBaseContributions[key] || 0;
+    const baseValue = rawBase + gearBase;
     // Format based on the type of stat
     if (key === 'totalPatk' || key === 'baseAtk' || key === 'strength' || key === 'pdefShred') {
       return baseValue.toLocaleString();
@@ -222,7 +237,7 @@ const GearManagement: React.FC<GearManagementProps> = ({
   };
 
   const getIncreaseDisplayValue = (key: string): string => {
-    const modValue = getModifierValue(key);
+    const modValue = getDisplayModifierValue(key);
     if (modValue === 0) return '';
 
     // Format based on the type of stat
@@ -312,9 +327,17 @@ const GearManagement: React.FC<GearManagementProps> = ({
     return inputs[baseKey] || 0;
   };
 
+  // Raw _mod value (used in edit mode inputs)
   const getModifierValue = (key: string): number => {
     const modKey = `${key}_mod` as keyof CalculatorInputs;
     return inputs[modKey] || 0;
+  };
+
+  // Display modifier: subtracts base-slot contributions so only delta/secondary shows as green/red
+  const getDisplayModifierValue = (key: string): number => {
+    const rawMod = getModifierValue(key);
+    const baseContrib = gearBaseContributions[key] || 0;
+    return rawMod - baseContrib;
   };
 
   const statsToDisplay = [
@@ -323,7 +346,7 @@ const GearManagement: React.FC<GearManagementProps> = ({
     'critDmg', 'elementalEnh', 'skillDmg', 'dmgBonus', 'dmgDuringResonance',
     'dmgToBoss', 'dmgToBeast', 'dmgToMech', 'dmgToDecayed', 'dmgToOtherworld',
     'dmgToDebuffed', 'dmgToScorched', 'dmgToPoisoned', 'dmgToBleeding',
-    'dmgToVulnerable', 'dmgToSlowed', 'dmgToExhausted'
+    'dmgToVulnerable', 'dmgToSlowed', 'dmgToExhausted', 'additionalDmg'
   ];
 
   return (
@@ -346,81 +369,112 @@ const GearManagement: React.FC<GearManagementProps> = ({
         <div className="slot-overview">
           <div className="slot-grid">
             {gearSlots.map(slot => {
-              const equippedGear = getEquippedGearForSlot(slot);
+              const baseGear = getEquippedGearForSubSlot(slot, 'base');
+              const secondaryGear = getEquippedGearForSubSlot(slot, 'secondary');
+              const hasAnyGear = baseGear || secondaryGear;
               return (
                 <div
                   key={slot}
-                  className={`slot-item ${equippedGear ? 'equipped' : 'empty'}`}
+                  className={`slot-item dual-slot ${hasAnyGear ? 'equipped' : 'empty'}`}
                   onClick={() => handleSlotClick(slot)}
                 >
                   <div className="slot-icon">
-                    {equippedGear ? '⚔️' : '📦'}
+                    {hasAnyGear ? '⚔️' : '📦'}
                   </div>
                   <div className="slot-info">
                     <div className="slot-name">{slotLabels[slot]}</div>
-                    <div className="slot-gear-name">
-                      {equippedGear ? equippedGear.name : 'Empty'}
+                    <div className="slot-sub-slots">
+                      <div className={`sub-slot-line ${baseGear ? 'filled' : ''}`}>
+                        <span className="sub-slot-label">B</span>
+                        <span className="sub-slot-gear-name" title={baseGear ? baseGear.name : 'Empty'}>
+                          {baseGear ? baseGear.name : 'Empty'}
+                        </span>
+                        {baseGear && (
+                          <button
+                            className="sub-slot-reset-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onUnequipGear(baseGear.id);
+                            }}
+                            title="Unequip base gear"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                      <div className={`sub-slot-line ${secondaryGear ? 'filled' : ''}`}>
+                        <span className="sub-slot-label">S</span>
+                        <span className="sub-slot-gear-name" title={secondaryGear ? secondaryGear.name : 'Empty'}>
+                          {secondaryGear ? secondaryGear.name : 'Empty'}
+                        </span>
+                        {secondaryGear && (
+                          <button
+                            className="sub-slot-reset-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onUnequipGear(secondaryGear.id);
+                            }}
+                            title="Unequip secondary gear"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Other Stats Slot - Special multi-equip slot with dual sub-slots */}
+            {(() => {
+              const safeOther = (equippedOtherStats && typeof equippedOtherStats === 'object' && !Array.isArray(equippedOtherStats))
+                ? equippedOtherStats : { base: [], secondary: [] };
+              const baseCount = (safeOther.base || []).length;
+              const secCount = (safeOther.secondary || []).length;
+              const totalCount = baseCount + secCount;
+              return (
+                <div
+                  className={`slot-item dual-slot other-stat-slot ${totalCount > 0 ? 'equipped' : 'empty'}`}
+                  onClick={() => setIsOtherStatListOpen(true)}
+                >
+                  <div className="slot-info">
+                    <div className="slot-name">Other Stats</div>
+                    <div className="slot-sub-slots">
+                      <div className="sub-slot-line">
+                        <span className="sub-slot-label">B</span>
+                        <span className="sub-slot-gear-name">
+                          {baseCount > 0 ? `${baseCount} Item${baseCount > 1 ? 's' : ''}` : 'Empty'}
+                        </span>
+                      </div>
+                      <div className="sub-slot-line">
+                        <span className="sub-slot-label" style={{ background: '#9333ea' }}>S</span>
+                        <span className="sub-slot-gear-name">
+                          {secCount > 0 ? `${secCount} Item${secCount > 1 ? 's' : ''}` : 'Empty'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="slot-indicator">
-                    {equippedGear ? (
+                    {totalCount > 0 && (
                       <div className="slot-indicator-wrapper">
                         <span className="slot-check-icon">✓</span>
                         <button
                           className="slot-reset-btn"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onUnequipGear(equippedGear.id);
+                            onUnequipAllOtherStats();
                           }}
-                          title="Unequip gear"
+                          title="Unequip all other stats"
                         >
                           ↺
                         </button>
-                      </div>
-                    ) : (
-                      <div className="slot-indicator-wrapper">
-                        <span className="slot-plus">+</span>
                       </div>
                     )}
                   </div>
                 </div>
               );
-            })}
-
-            {/* Other Stats Slot - Special multi-equip slot */}
-            <div
-              className={`slot-item other-stat-slot ${Array.isArray(equippedOtherStats) && equippedOtherStats.length > 0 ? 'equipped' : 'empty'}`}
-              onClick={() => setIsOtherStatListOpen(true)}
-            >
-              <div className="slot-icon">
-                {Array.isArray(equippedOtherStats) && equippedOtherStats.length > 0 ? '💠' : '➕'}
-              </div>
-              <div className="slot-info">
-                <div className="slot-name">Other Stats</div>
-                <div className="slot-gear-name">
-                  {Array.isArray(equippedOtherStats) && equippedOtherStats.length > 0
-                    ? `${equippedOtherStats.length} Item${equippedOtherStats.length > 1 ? 's' : ''} Equipped`
-                    : 'Empty'}
-                </div>
-              </div>
-              <div className="slot-indicator">
-                {Array.isArray(equippedOtherStats) && equippedOtherStats.length > 0 && (
-                  <div className="slot-indicator-wrapper">
-                    <span className="slot-check-icon">✓</span>
-                    <button
-                      className="slot-reset-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUnequipAllOtherStats();
-                      }}
-                      title="Unequip all other stats"
-                    >
-                      ↺
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+            })()}
 
             {/* Stats Display - Center Column */}
             <div className="stats-display-container">
@@ -435,9 +489,10 @@ const GearManagement: React.FC<GearManagementProps> = ({
                 {statsToDisplay.map(statKey => {
                   const isEditing = editingStat === statKey;
                   const baseValue = getBaseValue(statKey);
-                  const modValue = getModifierValue(statKey);
-                  const hasModifier = modValue !== 0;
-                  const isNegative = modValue < 0;
+                  const modValue = getModifierValue(statKey); // raw _mod for edit inputs
+                  const displayModValue = getDisplayModifierValue(statKey); // adjusted for display
+                  const hasModifier = displayModValue !== 0;
+                  const isNegative = displayModValue < 0;
 
                   const baseDisplay = getBaseDisplayValue(statKey);
                   const increaseDisplay = getIncreaseDisplayValue(statKey);
@@ -589,7 +644,11 @@ const GearManagement: React.FC<GearManagementProps> = ({
             ) : (
               <>
                 {(Array.isArray(otherStats) ? otherStats : []).map(otherStat => {
-                  const isEquipped = Array.isArray(equippedOtherStats) && equippedOtherStats.includes(otherStat.id);
+                  const safeOther = (equippedOtherStats && typeof equippedOtherStats === 'object' && !Array.isArray(equippedOtherStats))
+                    ? equippedOtherStats : { base: [], secondary: [] };
+                  const isInBase = (safeOther.base || []).includes(otherStat.id);
+                  const isInSecondary = (safeOther.secondary || []).includes(otherStat.id);
+                  const isEquipped = isInBase || isInSecondary;
                   const statsList = Object.entries(otherStat.stats)
                     .filter(([, value]) => value !== 0)
                     .map(([stat, value]) => (
@@ -600,8 +659,6 @@ const GearManagement: React.FC<GearManagementProps> = ({
                           {value! > 0 ? '+' : ''}{formatStatValue(value!)}
                         </span>
                       </div>
-
-
                     ));
 
                   return (
@@ -638,7 +695,8 @@ const GearManagement: React.FC<GearManagementProps> = ({
                       </div>
                       <div className="slot-gear-header">
                         <span className="slot-gear-name">{otherStat.name}</span>
-                        {isEquipped && <span className="slot-equipped-badge">EQUIPPED</span>}
+                        {isInBase && <span className="slot-equipped-badge" style={{ background: '#0891b2' }}>BASE</span>}
+                        {isInSecondary && <span className="slot-equipped-badge" style={{ background: '#9333ea' }}>SECONDARY</span>}
                       </div>
                       <div className="slot-gear-stats">
                         {statsList.length > 0 ? statsList : (
@@ -653,15 +711,23 @@ const GearManagement: React.FC<GearManagementProps> = ({
                             className="slot-gear-btn unequip-btn"
                             onClick={() => onUnequipOtherStat(otherStat.id)}
                           >
-                            Unequip
+                            Unequip ({isInBase ? 'Base' : 'Secondary'})
                           </button>
                         ) : (
-                          <button
-                            className="slot-gear-btn equip-btn"
-                            onClick={() => onEquipOtherStat(otherStat.id)}
-                          >
-                            Equip
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              className="slot-gear-btn equip-base-btn"
+                              onClick={() => onEquipOtherStat(otherStat.id, 'base')}
+                            >
+                              Equip Base
+                            </button>
+                            <button
+                              className="slot-gear-btn equip-secondary-btn"
+                              onClick={() => onEquipOtherStat(otherStat.id, 'secondary')}
+                            >
+                              Equip Secondary
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -698,14 +764,37 @@ const GearManagement: React.FC<GearManagementProps> = ({
         gears={gears}
       />
 
-      {/* Slot Selection Modal */}
+      {/* Slot Selection Modal - Dual Slot System */}
       {selectedSlot && (
         <div className={`modal ${isSlotModalOpen ? 'active' : ''}`}>
           <div className="modal-content slot-modal">
             <div className="modal-header">
-              <h2>{slotLabels[selectedSlot]} - Available Gears</h2>
+              <h2>{slotLabels[selectedSlot]} - Gear Slots</h2>
               <button className="close-modal" onClick={() => setIsSlotModalOpen(false)}>&times;</button>
             </div>
+
+            {/* Dual Slot Overview */}
+            <div className="dual-slot-overview">
+              <div className={`dual-slot-section ${getEquippedGearForSubSlot(selectedSlot, 'base') ? 'filled' : ''}`}>
+                <div className="dual-slot-title">Base Slot</div>
+                <div className="dual-slot-description">Contributes base stats only</div>
+                <div className="dual-slot-info">
+                  {getEquippedGearForSubSlot(selectedSlot, 'base')
+                    ? getEquippedGearForSubSlot(selectedSlot, 'base')!.name
+                    : 'Empty'}
+                </div>
+              </div>
+              <div className={`dual-slot-section ${getEquippedGearForSubSlot(selectedSlot, 'secondary') ? 'filled' : ''}`}>
+                <div className="dual-slot-title">Secondary Slot</div>
+                <div className="dual-slot-description">Delta (S - B) = Modifier</div>
+                <div className="dual-slot-info">
+                  {getEquippedGearForSubSlot(selectedSlot, 'secondary')
+                    ? getEquippedGearForSubSlot(selectedSlot, 'secondary')!.name
+                    : 'Empty'}
+                </div>
+              </div>
+            </div>
+
             <div className="slot-gears-list">
               {getGearsForSlot(selectedSlot).length === 0 ? (
                 <div className="no-slot-gears">
@@ -714,7 +803,8 @@ const GearManagement: React.FC<GearManagementProps> = ({
               ) : (
                 <>
                   {getGearsForSlot(selectedSlot).map(gear => {
-                    const isEquipped = equippedGears.includes(gear.id);
+                    const subSlot = getGearSubSlot(gear.id);
+                    const isEquipped = subSlot !== null;
                     const statsList = Object.entries(gear.stats)
                       .filter(([, value]) => value !== 0)
                       .map(([stat, value]) => (
@@ -725,8 +815,6 @@ const GearManagement: React.FC<GearManagementProps> = ({
                             {value! > 0 ? '+' : ''}{formatStatValue(value!)}
                           </span>
                         </div>
-
-
                       ));
 
                     return (
@@ -764,28 +852,40 @@ const GearManagement: React.FC<GearManagementProps> = ({
                         </div>
                         <div className="slot-gear-header">
                           <span className="slot-gear-name">{gear.name}</span>
-                          {isEquipped && <span className="slot-equipped-badge">EQUIPPED</span>}
+                          {isEquipped && (
+                            <span className="slot-equipped-badge">
+                              {subSlot === 'base' ? 'BASE' : 'SECONDARY'}
+                            </span>
+                          )}
                         </div>
                         <div className="slot-gear-stats">
                           {statsList.length > 0 ? statsList : (
                             <div className="gear-stat-item">No stats added</div>
                           )}
                         </div>
-                        <div className="slot-gear-actions">
+                        <div className="slot-gear-actions dual-slot-actions">
                           {isEquipped ? (
                             <button
                               className="slot-gear-btn unequip-btn"
                               onClick={() => onUnequipGear(gear.id)}
                             >
-                              Unequip
+                              Unequip ({subSlot === 'base' ? 'Base' : 'Secondary'})
                             </button>
                           ) : (
-                            <button
-                              className="slot-gear-btn equip-btn"
-                              onClick={() => onEquipGear(gear.id)}
-                            >
-                              Equip
-                            </button>
+                            <>
+                              <button
+                                className="slot-gear-btn equip-base-btn"
+                                onClick={() => onEquipGear(gear.id, 'base')}
+                              >
+                                Equip Base
+                              </button>
+                              <button
+                                className="slot-gear-btn equip-secondary-btn"
+                                onClick={() => onEquipGear(gear.id, 'secondary')}
+                              >
+                                Equip Secondary
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -859,10 +959,16 @@ const GearManagement: React.FC<GearManagementProps> = ({
                     </div>
                     <div className="slot-gear-stats">
                       <div className="gear-stat-item">
-                        • {preset.equippedGears.length} Gears Equipped
+                        • {Array.isArray(preset.equippedGears)
+                          ? (preset.equippedGears as unknown as string[]).length
+                          : countEquippedGears(preset.equippedGears)} Gears Equipped
                       </div>
                       <div className="gear-stat-item">
-                        • {(preset.equippedOtherStats || (preset as any).equippedCircuits || []).length} Other Stats Equipped
+                        • {(() => {
+                          const raw = preset.equippedOtherStats || (preset as any).equippedCircuits || { base: [], secondary: [] };
+                          if (Array.isArray(raw)) return raw.length;
+                          return (raw.base || []).length + (raw.secondary || []).length;
+                        })()} Other Stats Equipped
                       </div>
                     </div>
                     <div className="slot-gear-actions">

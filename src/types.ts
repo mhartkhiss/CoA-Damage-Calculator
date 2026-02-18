@@ -25,9 +25,46 @@ export interface GearStats {
   dmgToVulnerable?: number;
   dmgToSlowed?: number;
   dmgToExhausted?: number;
+  additionalDmg?: number;
 }
 
 export type GearSlot = 'helmet' | 'chest' | 'gloves' | 'pants' | 'boots' | 'seal' | 'talisman' | 'weapon' | 'necklace' | 'bracers' | 'ring';
+
+// Dual-slot system: each gear slot type has a base and secondary sub-slot
+export type EquippedGearSlots = Partial<Record<GearSlot, {
+  base?: string;      // gear ID for the base sub-slot
+  secondary?: string; // gear ID for the secondary sub-slot
+}>>;
+
+// Stats that are considered "Base Stats" for the dual-slot system.
+// Base Slot gear only applies these stats directly; damage modifier stats are ignored.
+// The delta (Secondary - Base) is calculated for ALL stats.
+export const BASE_STAT_KEYS: readonly string[] = [
+  'baseAtk', 'atkPercent', 'strength', 'strengthPercent',
+  'damageReduction', 'physicalPen', 'pdefShred'
+];
+
+// Utility: get all equipped gear IDs from the dual-slot structure
+export function getAllEquippedGearIds(slots: EquippedGearSlots): string[] {
+  const ids: string[] = [];
+  for (const slot in slots) {
+    const slotData = slots[slot as GearSlot];
+    if (slotData?.base) ids.push(slotData.base);
+    if (slotData?.secondary) ids.push(slotData.secondary);
+  }
+  return ids;
+}
+
+// Utility: count total equipped gears
+export function countEquippedGears(slots: EquippedGearSlots): number {
+  let count = 0;
+  for (const slot in slots) {
+    const slotData = slots[slot as GearSlot];
+    if (slotData?.base) count++;
+    if (slotData?.secondary) count++;
+  }
+  return count;
+}
 
 export interface Gear {
   id: string;
@@ -42,6 +79,12 @@ export interface OtherStat {
   stats: GearStats;
   isSetEffect?: boolean;
   requiredGearIds?: string[];
+}
+
+// Dual-slot system for Other Stats: base group merges to base values, secondary group goes to modifiers
+export interface EquippedOtherStatSlots {
+  base: string[];
+  secondary: string[];
 }
 
 // Export CalculatorInputs interface
@@ -73,6 +116,7 @@ export interface CalculatorInputs {
   dmgToVulnerable: number;
   dmgToSlowed: number;
   dmgToExhausted: number;
+  additionalDmg: number;
 
   // Modifiers
   baseAtk_mod: number;
@@ -100,20 +144,21 @@ export interface CalculatorInputs {
   dmgToVulnerable_mod: number;
   dmgToSlowed_mod: number;
   dmgToExhausted_mod: number;
+  additionalDmg_mod: number;
 }
 
 export interface CalculatorState extends CalculatorInputs {
   resonanceActive: boolean;
   gears: Gear[];
-  equippedGears: string[];
+  equippedGears: EquippedGearSlots;
 }
 
 export interface Preset {
   id: string;
   name: string;
   inputs: CalculatorInputs;
-  equippedGears: string[];
-  equippedOtherStats: string[];
+  equippedGears: EquippedGearSlots;
+  equippedOtherStats: EquippedOtherStatSlots;
   resonanceActive: boolean;
 }
 

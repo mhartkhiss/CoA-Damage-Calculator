@@ -318,6 +318,16 @@ const CalculatorGrid: React.FC<CalculatorGridProps> = ({
           onModifierChange={(value) => onInputChange('dmgToExhausted_mod', value)}
           totalValue={totalValues.dmgToExhausted_total}
         />
+
+        <InputGroup
+          id="additionalDmg"
+          label="Additional DMG (%)"
+          value={inputs.additionalDmg}
+          modifierValue={inputs.additionalDmg_mod}
+          onValueChange={(value) => onInputChange('additionalDmg', value)}
+          onModifierChange={(value) => onInputChange('additionalDmg_mod', value)}
+          totalValue={totalValues.additionalDmg_total}
+        />
       </div>
     </>
   );

@@ -2304,6 +2304,190 @@ button:active {
   white-space: nowrap;
 }
 
+/* Dual-Slot System Styles */
+.slot-item.dual-slot {
+  padding: 6px 10px;
+}
+
+.slot-item.dual-slot .slot-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.slot-sub-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.sub-slot-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  min-height: 18px;
+}
+
+.sub-slot-line.filled {
+  color: var(--text-primary);
+}
+
+.sub-slot-label {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  padding: 0px 4px;
+  border-radius: 3px;
+  min-width: 14px;
+  text-align: center;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.sub-slot-line.filled .sub-slot-label {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--success);
+}
+
+.sub-slot-gear-name {
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+  flex: 1;
+}
+
+.sub-slot-line.filled .sub-slot-gear-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sub-slot-reset-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--text-muted);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.2s ease;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.slot-item:hover .sub-slot-reset-btn {
+  opacity: 1;
+}
+
+.sub-slot-reset-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+  transform: none;
+}
+
+/* Dual Slot Overview in Modal */
+.dual-slot-overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dual-slot-section {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.dual-slot-section.filled {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.dual-slot-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+.dual-slot-section.filled .dual-slot-title {
+  color: var(--success);
+}
+
+.dual-slot-description {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.dual-slot-info {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dual-slot-section.filled .dual-slot-info {
+  color: var(--text-primary);
+}
+
+/* Dual Slot Action Buttons in Modal */
+.slot-gear-actions.dual-slot-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.slot-gear-btn.equip-base-btn {
+  background: rgba(6, 182, 212, 0.15);
+  color: #06b6d4;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.slot-gear-btn.equip-base-btn:hover {
+  background: rgba(6, 182, 212, 0.25);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+  transform: translateY(-1px);
+}
+
+.slot-gear-btn.equip-secondary-btn {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.slot-gear-btn.equip-secondary-btn:hover {
+  background: rgba(168, 85, 247, 0.25);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
+  transform: translateY(-1px);
+}
+
 .no-gears-msg {
   text-align: center;
   color: var(--text-muted);

@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 
 import './DamageCalculator.css';
 import GearManagement from './components/GearManagement';
 import StickyFooter from './components/StickyFooter';
 import CustomDialog from './components/CustomDialog';
-import type { CalculatorInputs, Gear, OtherStat, Preset, DialogConfig } from './types';
+import type { CalculatorInputs, Gear, GearSlot, OtherStat, Preset, DialogConfig, EquippedGearSlots, EquippedOtherStatSlots } from './types';
+import { BASE_STAT_KEYS, getAllEquippedGearIds } from './types';
 
 import { useDamageCalculator } from './hooks/useDamageCalculator';
 import { useLocalStorage, useLocalStorageInputs } from './hooks/useLocalStorage';
@@ -38,6 +39,7 @@ const defaultInputs: CalculatorInputs = {
   dmgToVulnerable: 0,
   dmgToSlowed: 0,
   dmgToExhausted: 0,
+  additionalDmg: 0,
 
   // Modifiers
   baseAtk_mod: 0,
@@ -65,6 +67,7 @@ const defaultInputs: CalculatorInputs = {
   dmgToVulnerable_mod: 0,
   dmgToSlowed_mod: 0,
   dmgToExhausted_mod: 0,
+  additionalDmg_mod: 0,
 };
 
 const inputKeys = Object.keys(defaultInputs) as (keyof CalculatorInputs)[];
@@ -80,10 +83,11 @@ function App() {
 
   const [resonanceActive, setResonanceActive] = useLocalStorage('resonanceActive', false);
   const [gears, setGears] = useLocalStorage<Gear[]>('gears', []);
-  const [equippedGears, setEquippedGears] = useLocalStorage<string[]>('equippedGears', []);
+  const [equippedGears, setEquippedGears] = useLocalStorage<EquippedGearSlots>('equippedGears', {});
   const [otherStats, setOtherStats] = useLocalStorage<OtherStat[]>('otherStats', []);
-  const [equippedOtherStats, setEquippedOtherStats] = useLocalStorage<string[]>('equippedOtherStats', []);
+  const [equippedOtherStats, setEquippedOtherStats] = useLocalStorage<EquippedOtherStatSlots>('equippedOtherStats', { base: [], secondary: [] });
   const [presets, setPresets] = useLocalStorage<Preset[]>('presets', []);
+  const [gearBaseContributions, setGearBaseContributions] = useState<Record<string, number>>({});
   const [activePresetId, setActivePresetId] = useLocalStorage<string | null>('activePresetId', null);
 
   const showDialog = (config: Omit<DialogConfig, 'isOpen'>) => {
@@ -94,17 +98,37 @@ function App() {
     setDialog(prev => ({ ...prev, isOpen: false }));
   };
 
-  // Safety check for localStorage corruption
+  // Safety check for localStorage corruption & backward compatibility
   useEffect(() => {
     if (!Array.isArray(gears)) setGears([]);
-    if (!Array.isArray(equippedGears)) setEquippedGears([]);
+    // Backward compat: convert old string[] equippedGears to new EquippedGearSlots format
+    if (Array.isArray(equippedGears)) {
+      const converted: EquippedGearSlots = {};
+      const validGears = Array.isArray(gears) ? gears : [];
+      (equippedGears as unknown as string[]).forEach((gearId: string) => {
+        const gear = validGears.find(g => g.id === gearId);
+        if (gear) {
+          converted[gear.slot] = { ...(converted[gear.slot] || {}), base: gearId };
+        }
+      });
+      setEquippedGears(converted);
+    } else if (equippedGears === null || equippedGears === undefined) {
+      setEquippedGears({});
+    }
     if (!Array.isArray(otherStats)) setOtherStats([]);
-    if (!Array.isArray(equippedOtherStats)) setEquippedOtherStats([]);
+    // Backward compat: convert old string[] equippedOtherStats to new EquippedOtherStatSlots format
+    if (Array.isArray(equippedOtherStats)) {
+      setEquippedOtherStats({ base: equippedOtherStats as unknown as string[], secondary: [] });
+    } else if (equippedOtherStats === null || equippedOtherStats === undefined) {
+      setEquippedOtherStats({ base: [], secondary: [] });
+    }
     if (!Array.isArray(presets)) setPresets([]);
   }, []);
 
-
-  const { results, totalValues } = useDamageCalculator(inputs, resonanceActive);
+  // Calculator uses raw inputs (all contributions flow through _mod)
+  // gearBaseContributions adjusts the "base damage" display so base-slot items
+  // show as base damage, not final damage increase
+  const { results, totalValues } = useDamageCalculator(inputs, resonanceActive, gearBaseContributions);
 
   // Update actual attack display
   useEffect(() => {
@@ -114,38 +138,60 @@ function App() {
     }
   }, [results.actualAttack]);
 
-  // Auto-equip set effects
+  // Auto-equip set effects into Other Stats base group
+  // A set effect is ACTIVE when: all required gear IDs are in BASE slots
+  // AND none of those slots have a secondary gear equipped (secondary breaks the set)
   useEffect(() => {
     const validOtherStats = Array.isArray(otherStats) ? otherStats : [];
-    const validEquippedGears = Array.isArray(equippedGears) ? equippedGears : [];
-    const validEquippedOtherStats = Array.isArray(equippedOtherStats) ? equippedOtherStats : [];
+    const validGears = Array.isArray(gears) ? gears : [];
+    const validEquippedGears = (equippedGears && typeof equippedGears === 'object' && !Array.isArray(equippedGears)) ? equippedGears : {};
+    const safeEquippedOther = (equippedOtherStats && typeof equippedOtherStats === 'object' && !Array.isArray(equippedOtherStats))
+      ? equippedOtherStats
+      : { base: [], secondary: [] };
 
     const setEffectStats = validOtherStats.filter(stat => stat.isSetEffect && stat.requiredGearIds && Array.isArray(stat.requiredGearIds) && stat.requiredGearIds.length > 0);
     if (setEffectStats.length === 0) return;
 
     let modified = false;
-    const newEquippedOtherStats = [...validEquippedOtherStats];
+    const newBaseList = [...(safeEquippedOther.base || [])];
 
     setEffectStats.forEach(stat => {
-      const allRequiredEquipped = stat.requiredGearIds!.every(id => validEquippedGears.includes(id));
-      const isCurrentlyEquipped = newEquippedOtherStats.includes(stat.id);
+      // Check: all required gears must be equipped (base or secondary)
+      // Breaking: if a required gear is in the base slot AND a different secondary is also in that slot
+      const isSetActive = stat.requiredGearIds!.every(requiredId => {
+        const gear = validGears.find(g => g.id === requiredId);
+        if (!gear) return false;
+        const slotData = validEquippedGears[gear.slot];
+        if (!slotData) return false;
 
-      if (allRequiredEquipped && !isCurrentlyEquipped) {
-        newEquippedOtherStats.push(stat.id);
+        const isInBase = slotData.base === requiredId;
+        const isInSecondary = slotData.secondary === requiredId;
+        // Must be equipped in at least one sub-slot
+        if (!isInBase && !isInSecondary) return false;
+        // If the required gear is in base and a secondary exists, the set breaks
+        if (isInBase && slotData.secondary) return false;
+
+        return true;
+      });
+
+      const isCurrentlyEquipped = newBaseList.includes(stat.id);
+
+      if (isSetActive && !isCurrentlyEquipped) {
+        newBaseList.push(stat.id);
         modified = true;
-      } else if (!allRequiredEquipped && isCurrentlyEquipped) {
-        const index = newEquippedOtherStats.indexOf(stat.id);
+      } else if (!isSetActive && isCurrentlyEquipped) {
+        const index = newBaseList.indexOf(stat.id);
         if (index > -1) {
-          newEquippedOtherStats.splice(index, 1);
+          newBaseList.splice(index, 1);
           modified = true;
         }
       }
     });
 
     if (modified) {
-      setEquippedOtherStats(newEquippedOtherStats);
+      setEquippedOtherStats({ ...safeEquippedOther, base: newBaseList });
     }
-  }, [equippedGears, otherStats, equippedOtherStats, setEquippedOtherStats]);
+  }, [equippedGears, gears, otherStats, equippedOtherStats, setEquippedOtherStats]);
 
   const handleInputChange = (key: keyof CalculatorInputs, value: number) => {
     updateInput(key, value);
@@ -183,7 +229,7 @@ function App() {
 
   const handleExportData = () => {
     const exportData = {
-      version: '1.2', // Bump version for other stats rename
+      version: '3.0', // Bump version for dual-slot Other Stats & base merge
       exportDate: new Date().toISOString(),
       calculatorInputs: inputs,
       resonanceActive,
@@ -243,9 +289,22 @@ function App() {
                 setGears(importedData.gears);
               }
 
-              // Import equipped gears
-              if (Array.isArray(importedData.equippedGears)) {
-                setEquippedGears(importedData.equippedGears);
+              // Import equipped gears (handle both old array and new object format)
+              if (importedData.equippedGears) {
+                if (Array.isArray(importedData.equippedGears)) {
+                  // Convert old string[] format to new EquippedGearSlots
+                  const importedGearsList = importedData.gears || [];
+                  const converted: EquippedGearSlots = {};
+                  (importedData.equippedGears as string[]).forEach((gearId: string) => {
+                    const gear = importedGearsList.find((g: Gear) => g.id === gearId);
+                    if (gear) {
+                      converted[gear.slot as GearSlot] = { ...(converted[gear.slot as GearSlot] || {}), base: gearId };
+                    }
+                  });
+                  setEquippedGears(converted);
+                } else {
+                  setEquippedGears(importedData.equippedGears);
+                }
               }
 
               // Import other stats
@@ -253,9 +312,14 @@ function App() {
                 setOtherStats(importedData.otherStats || importedData.circuits);
               }
 
-              // Import equipped other stats
-              if (Array.isArray(importedData.equippedOtherStats || importedData.equippedCircuits)) {
-                setEquippedOtherStats(importedData.equippedOtherStats || importedData.equippedCircuits);
+              // Import equipped other stats (handle both old string[] and new EquippedOtherStatSlots)
+              const importedOtherEquipped = importedData.equippedOtherStats || importedData.equippedCircuits;
+              if (importedOtherEquipped) {
+                if (Array.isArray(importedOtherEquipped)) {
+                  setEquippedOtherStats({ base: importedOtherEquipped, secondary: [] });
+                } else {
+                  setEquippedOtherStats(importedOtherEquipped);
+                }
               }
 
               setActivePresetId(null); // Imported data means no active preset
@@ -281,6 +345,12 @@ function App() {
     input.click();
   };
 
+  // Helper: check if a gear ID is equipped in any slot
+  const isGearEquipped = (gearId: string): boolean => {
+    const validSlots = (equippedGears && typeof equippedGears === 'object' && !Array.isArray(equippedGears)) ? equippedGears : {};
+    return getAllEquippedGearIds(validSlots).includes(gearId);
+  };
+
   // Gear Handlers
   const handleAddGear = (gearData: Omit<Gear, 'id'>) => {
     const newGear: Gear = {
@@ -291,106 +361,74 @@ function App() {
   };
 
   const handleEditGear = (gearId: string, updates: Omit<Gear, 'id'>) => {
+    const oldGear = gears.find(g => g.id === gearId);
     setGears(gears.map(gear =>
       gear.id === gearId
         ? { ...gear, ...updates }
         : gear
     ));
 
-    // If gear is equipped, unequip and re-equip to apply changes
-    if (Array.isArray(equippedGears) && equippedGears.includes(gearId)) {
+    // If slot type changed and gear was equipped, unequip from old slot
+    if (oldGear && oldGear.slot !== updates.slot && isGearEquipped(gearId)) {
       handleUnequipGear(gearId);
-      setTimeout(() => handleEquipGear(gearId), 0);
     }
-    setActivePresetId(null); // Editing gear invalidates the active preset
+    // Stats will be recalculated by the useEffect that watches gears/equippedGears
+    setActivePresetId(null);
   };
 
   const handleDeleteGear = (gearId: string) => {
-    // Unequip if equipped
-    if (Array.isArray(equippedGears) && equippedGears.includes(gearId)) {
+    if (isGearEquipped(gearId)) {
       handleUnequipGear(gearId);
     }
     setGears(gears.filter(gear => gear.id !== gearId));
-    setActivePresetId(null); // Deleting gear invalidates the active preset
+    setActivePresetId(null);
   };
 
-  const handleEquipGear = (gearId: string) => {
-    if (!Array.isArray(equippedGears) || equippedGears.includes(gearId)) return;
-
+  const handleEquipGear = (gearId: string, subSlot: 'base' | 'secondary') => {
     const gear = gears.find(g => g.id === gearId);
     if (!gear) return;
 
-    // Check if there's already an equipped item of the same slot
-    const existingEquippedGearOfSlot = gears.find(g =>
-      Array.isArray(equippedGears) && equippedGears.includes(g.id) && g.slot === gear.slot
-    );
+    // Can't equip the same gear in both sub-slots
+    const currentSlotData = equippedGears[gear.slot];
+    if (subSlot === 'base' && currentSlotData?.secondary === gearId) return;
+    if (subSlot === 'secondary' && currentSlotData?.base === gearId) return;
 
-    // Calculate new equipped gears array
-    let newEquippedGears = Array.isArray(equippedGears) ? [...equippedGears] : [];
-
-    // If there's an existing equipped gear of the same slot, unequip it first
-    if (existingEquippedGearOfSlot) {
-      // Remove the existing gear's stats from modifier inputs
-      Object.entries(existingEquippedGearOfSlot.stats).forEach(([stat, value]) => {
-        if (value && value !== 0) {
-          if (stat === 'totalPatk') return;
-          const modKey = `${stat}_mod` as keyof CalculatorInputs;
-
-          if (modKey in inputs) {
-            const currentValue = inputs[modKey] || 0;
-            updateInput(modKey, currentValue - value);
-          }
-        }
-      });
-
-      // Remove from equipped gears array
-      newEquippedGears = newEquippedGears.filter(id => id !== existingEquippedGearOfSlot.id);
+    // If gear is already equipped elsewhere, unequip it first
+    if (isGearEquipped(gearId)) {
+      handleUnequipGear(gearId);
     }
 
-    // Add new gear stats to modifier inputs
-    Object.entries(gear.stats).forEach(([stat, value]) => {
-      if (value && value !== 0) {
-        if (stat === 'totalPatk') {
-          console.warn('Gear stat "totalPatk" is deprecated.');
-          return;
-        }
-        const modKey = `${stat}_mod` as keyof CalculatorInputs;
-
-        if (modKey in inputs) {
-          const currentValue = inputs[modKey] || 0;
-          updateInput(modKey, currentValue + value);
-        }
+    setEquippedGears(prev => ({
+      ...prev,
+      [gear.slot]: {
+        ...prev[gear.slot],
+        [subSlot]: gearId
       }
-    });
-
-    // Add new gear to equipped array
-    newEquippedGears.push(gearId);
-
-    setEquippedGears(newEquippedGears);
-    setActivePresetId(null); // Equipping gear invalidates the active preset
+    }));
+    setActivePresetId(null);
   };
 
   const handleUnequipGear = (gearId: string) => {
-    if (!Array.isArray(equippedGears) || !equippedGears.includes(gearId)) return;
-
     const gear = gears.find(g => g.id === gearId);
     if (!gear) return;
 
-    // Remove gear stats from modifier inputs
-    Object.entries(gear.stats).forEach(([stat, value]) => {
-      if (value && value !== 0) {
-        if (stat === 'totalPatk') return;
-        const modKey = `${stat}_mod` as keyof CalculatorInputs;
+    setEquippedGears(prev => {
+      const slotData = prev[gear.slot];
+      if (!slotData) return prev;
 
-        if (modKey in inputs) {
-          const currentValue = inputs[modKey] || 0;
-          updateInput(modKey, currentValue - value);
-        }
+      const newSlotData = { ...slotData };
+      if (newSlotData.base === gearId) delete newSlotData.base;
+      if (newSlotData.secondary === gearId) delete newSlotData.secondary;
+
+      const newSlots = { ...prev };
+      if (!newSlotData.base && !newSlotData.secondary) {
+        delete newSlots[gear.slot];
+      } else {
+        newSlots[gear.slot] = newSlotData;
       }
+      return newSlots;
     });
-
-    setEquippedGears((Array.isArray(equippedGears) ? equippedGears : []).filter(id => id !== gearId));
-    setActivePresetId(null); // Unequipping gear invalidates the active preset
+    setActivePresetId(null);
   };
 
   // Other Stat Handlers
@@ -408,74 +446,61 @@ function App() {
         ? { ...stat, ...updates }
         : stat
     ));
-
-    // If other stat is equipped, unequip and re-equip to apply changes
-    if (Array.isArray(equippedOtherStats) && equippedOtherStats.includes(otherStatId)) {
-      handleUnequipOtherStat(otherStatId);
-      setTimeout(() => handleEquipOtherStat(otherStatId), 0);
-    }
-    setActivePresetId(null); // Editing other stat invalidates the active preset
+    // useEffect will recalculate stats automatically since otherStats changed
+    setActivePresetId(null);
   };
 
   const handleDeleteOtherStat = (otherStatId: string) => {
-    if (Array.isArray(equippedOtherStats) && equippedOtherStats.includes(otherStatId)) {
-      handleUnequipOtherStat(otherStatId);
+    // Remove from equipped lists if present
+    const safeEquipped = (equippedOtherStats && typeof equippedOtherStats === 'object' && !Array.isArray(equippedOtherStats))
+      ? equippedOtherStats : { base: [], secondary: [] };
+    const inBase = (safeEquipped.base || []).includes(otherStatId);
+    const inSecondary = (safeEquipped.secondary || []).includes(otherStatId);
+    if (inBase || inSecondary) {
+      setEquippedOtherStats({
+        base: (safeEquipped.base || []).filter(id => id !== otherStatId),
+        secondary: (safeEquipped.secondary || []).filter(id => id !== otherStatId),
+      });
     }
     setOtherStats(otherStats.filter(s => s.id !== otherStatId));
-    setActivePresetId(null); // Deleting other stat invalidates the active preset
+    setActivePresetId(null);
   };
 
-  const handleEquipOtherStat = (otherStatId: string) => {
-    if (!Array.isArray(equippedOtherStats) || equippedOtherStats.includes(otherStatId)) return;
+  const handleEquipOtherStat = (otherStatId: string, subSlot: 'base' | 'secondary') => {
+    const safeEquipped = (equippedOtherStats && typeof equippedOtherStats === 'object' && !Array.isArray(equippedOtherStats))
+      ? equippedOtherStats : { base: [], secondary: [] };
 
-    const otherStat = otherStats.find(s => s.id === otherStatId);
-    if (!otherStat) return;
+    // Already equipped in the target group
+    if (subSlot === 'base' && (safeEquipped.base || []).includes(otherStatId)) return;
+    if (subSlot === 'secondary' && (safeEquipped.secondary || []).includes(otherStatId)) return;
 
-    const newEquippedOtherStats = [...equippedOtherStats];
+    // Remove from the other group if present
+    const newBase = (safeEquipped.base || []).filter(id => id !== otherStatId);
+    const newSecondary = (safeEquipped.secondary || []).filter(id => id !== otherStatId);
 
-    // Add new other stat stats
-    Object.entries(otherStat.stats).forEach(([stat, value]) => {
-      if (value && value !== 0) {
-        if (stat === 'totalPatk') return;
-        const modKey = `${stat}_mod` as keyof CalculatorInputs;
+    if (subSlot === 'base') {
+      newBase.push(otherStatId);
+    } else {
+      newSecondary.push(otherStatId);
+    }
 
-        if (modKey in inputs) {
-          const currentValue = inputs[modKey] || 0;
-          updateInput(modKey, currentValue + value);
-        }
-      }
-    });
-    newEquippedOtherStats.push(otherStatId);
-    setEquippedOtherStats(newEquippedOtherStats);
-    setActivePresetId(null); // Equipping other stat invalidates the active preset
+    setEquippedOtherStats({ base: newBase, secondary: newSecondary });
+    setActivePresetId(null);
   };
 
   const handleUnequipOtherStat = (otherStatId: string) => {
-    if (!Array.isArray(equippedOtherStats) || !equippedOtherStats.includes(otherStatId)) return;
+    const safeEquipped = (equippedOtherStats && typeof equippedOtherStats === 'object' && !Array.isArray(equippedOtherStats))
+      ? equippedOtherStats : { base: [], secondary: [] };
 
-    const otherStat = otherStats.find(s => s.id === otherStatId);
-    if (!otherStat) return;
-
-    Object.entries(otherStat.stats).forEach(([stat, value]) => {
-      if (value && value !== 0) {
-        if (stat === 'totalPatk') return;
-        const modKey = `${stat}_mod` as keyof CalculatorInputs;
-
-        if (modKey in inputs) {
-          const currentValue = inputs[modKey] || 0;
-          updateInput(modKey, currentValue - value);
-        }
-      }
+    setEquippedOtherStats({
+      base: (safeEquipped.base || []).filter(id => id !== otherStatId),
+      secondary: (safeEquipped.secondary || []).filter(id => id !== otherStatId),
     });
-
-    setEquippedOtherStats((Array.isArray(equippedOtherStats) ? equippedOtherStats : []).filter(id => id !== otherStatId));
-    setActivePresetId(null); // Unequipping other stat invalidates the active preset
+    setActivePresetId(null);
   };
 
   const handleUnequipAllOtherStats = () => {
-    if (!Array.isArray(equippedOtherStats) || equippedOtherStats.length === 0) return;
-
-    setEquippedOtherStats([]);
+    setEquippedOtherStats({ base: [], secondary: [] });
     setActivePresetId(null);
   };
 
@@ -490,8 +515,8 @@ function App() {
         modifierKeys.forEach(key => {
           updateInput(key, 0);
         });
-        setEquippedGears([]);
-        setEquippedOtherStats([]);
+        setEquippedGears({});
+        setEquippedOtherStats({ base: [], secondary: [] });
         setActivePresetId(null);
       }
     });
@@ -510,7 +535,7 @@ function App() {
           'critDmg', 'elementalEnh', 'skillDmg', 'dmgBonus', 'dmgDuringResonance',
           'dmgToBoss', 'dmgToBeast', 'dmgToMech', 'dmgToDecayed', 'dmgToOtherworld',
           'dmgToDebuffed', 'dmgToScorched', 'dmgToPoisoned', 'dmgToBleeding',
-          'dmgToVulnerable', 'dmgToSlowed', 'dmgToExhausted'
+          'dmgToVulnerable', 'dmgToSlowed', 'dmgToExhausted', 'additionalDmg'
         ];
 
         setInputs((prevInputs: CalculatorInputs) => {
@@ -521,34 +546,30 @@ function App() {
             let mergedValue: number;
 
             if (key === 'totalPatk') {
-              // totalPatk is special: it doesn't have a _mod counterpart, 
-              // but we want to capture the fully calculated total value
+              // totalPatk is special: capture the fully calculated total value
               mergedValue = results.effectiveTotalPatk;
             } else if (modKey in newInputs) {
               const currentBase = newInputs[key] || 0;
               const currentMod = newInputs[modKey] || 0;
               mergedValue = currentBase + currentMod;
 
-              // Key has a modifier, reset it to 0
+              // Reset modifier to 0
               (newInputs as any)[modKey] = 0;
               window.localStorage.setItem(modKey as string, JSON.stringify(0));
             } else {
-              // Not totalPatk and no _mod found, skip
               return;
             }
 
-            // Apply merged value to base stat
             (newInputs as any)[key] = mergedValue;
-
-            // Sync to localStorage
             window.localStorage.setItem(key as string, JSON.stringify(mergedValue));
           });
 
           return newInputs;
         });
 
-        setEquippedGears([]);
-        setEquippedOtherStats([]);
+        setEquippedGears({});
+        setEquippedOtherStats({ base: [], secondary: [] });
+        setGearBaseContributions({});
         setActivePresetId(null);
       }
     });
@@ -567,7 +588,7 @@ function App() {
           'critDmg', 'elementalEnh', 'skillDmg', 'dmgBonus', 'dmgDuringResonance',
           'dmgToBoss', 'dmgToBeast', 'dmgToMech', 'dmgToDecayed', 'dmgToOtherworld',
           'dmgToDebuffed', 'dmgToScorched', 'dmgToPoisoned', 'dmgToBleeding',
-          'dmgToVulnerable', 'dmgToSlowed', 'dmgToExhausted'
+          'dmgToVulnerable', 'dmgToSlowed', 'dmgToExhausted', 'additionalDmg'
         ];
 
         setInputs((prevInputs: CalculatorInputs) => {
@@ -633,27 +654,54 @@ function App() {
           return newInputs;
         });
 
-        setEquippedGears([]);
-        setEquippedOtherStats([]);
+        setEquippedGears({});
+        setEquippedOtherStats({ base: [], secondary: [] });
+        setGearBaseContributions({});
         setActivePresetId(null);
       }
     });
   };
 
+  // Helper to convert legacy string[] equippedGears to EquippedGearSlots
+  const convertLegacyEquippedGears = (legacyGears: string[]): EquippedGearSlots => {
+    const converted: EquippedGearSlots = {};
+    const validGears = Array.isArray(gears) ? gears : [];
+    legacyGears.forEach((gearId: string) => {
+      const gear = validGears.find(g => g.id === gearId);
+      if (gear) {
+        converted[gear.slot] = { ...(converted[gear.slot] || {}), base: gearId };
+      }
+    });
+    return converted;
+  };
+
   const isStateModifiedFromPreset = (preset: Preset) => {
-    // Helper to check if current state matches the preset
     const inputsMatch = Object.keys(preset.inputs).every(key => {
       const k = key as keyof CalculatorInputs;
-      // Use a small epsilon for floating point comparisons
       return Math.abs(preset.inputs[k] - inputs[k]) < 0.001;
     });
 
-    const gearsMatch = preset.equippedGears.length === equippedGears.length &&
-      preset.equippedGears.every(id => equippedGears.includes(id));
+    // Compare equippedGears using gear IDs (handles both old and new formats)
+    const presetEquippedGears = Array.isArray(preset.equippedGears)
+      ? convertLegacyEquippedGears(preset.equippedGears as unknown as string[])
+      : preset.equippedGears;
+    const presetGearIds = getAllEquippedGearIds(presetEquippedGears).sort();
+    const currentGearIds = getAllEquippedGearIds(equippedGears).sort();
+    const gearsMatch = presetGearIds.length === currentGearIds.length &&
+      presetGearIds.every((id, i) => id === currentGearIds[i]);
 
-    const presetOtherStats = preset.equippedOtherStats || (preset as any).equippedCircuits || [];
-    const otherStatsMatch = presetOtherStats.length === equippedOtherStats.length &&
-      presetOtherStats.every(id => equippedOtherStats.includes(id));
+    // Compare equippedOtherStats (handles both old string[] and new EquippedOtherStatSlots)
+    const presetOtherRaw = preset.equippedOtherStats || (preset as any).equippedCircuits || { base: [], secondary: [] };
+    const presetOther: EquippedOtherStatSlots = Array.isArray(presetOtherRaw)
+      ? { base: presetOtherRaw as string[], secondary: [] }
+      : presetOtherRaw;
+    const safeCurrentOther = (equippedOtherStats && typeof equippedOtherStats === 'object' && !Array.isArray(equippedOtherStats))
+      ? equippedOtherStats : { base: [], secondary: [] };
+    const otherBaseMatch = (presetOther.base || []).length === (safeCurrentOther.base || []).length &&
+      (presetOther.base || []).every(id => (safeCurrentOther.base || []).includes(id));
+    const otherSecMatch = (presetOther.secondary || []).length === (safeCurrentOther.secondary || []).length &&
+      (presetOther.secondary || []).every(id => (safeCurrentOther.secondary || []).includes(id));
+    const otherStatsMatch = otherBaseMatch && otherSecMatch;
 
     const resonanceMatch = preset.resonanceActive === resonanceActive;
 
@@ -665,8 +713,8 @@ function App() {
       id: Date.now().toString(),
       name,
       inputs: { ...inputs },
-      equippedGears: [...equippedGears],
-      equippedOtherStats: [...equippedOtherStats],
+      equippedGears: JSON.parse(JSON.stringify(equippedGears)), // deep clone
+      equippedOtherStats: JSON.parse(JSON.stringify(equippedOtherStats)),
       resonanceActive
     };
     setPresets([...presets, newPreset]);
@@ -675,8 +723,21 @@ function App() {
 
   const forceLoadPreset = (preset: Preset) => {
     setResonanceActive(preset.resonanceActive);
-    setEquippedGears(preset.equippedGears);
-    setEquippedOtherStats(preset.equippedOtherStats || (preset as any).equippedCircuits || []);
+
+    // Handle backward compatibility for equippedGears
+    if (Array.isArray(preset.equippedGears)) {
+      setEquippedGears(convertLegacyEquippedGears(preset.equippedGears as unknown as string[]));
+    } else {
+      setEquippedGears(preset.equippedGears);
+    }
+
+    // Handle backward compatibility for equippedOtherStats
+    const rawOther = preset.equippedOtherStats || (preset as any).equippedCircuits || { base: [], secondary: [] };
+    if (Array.isArray(rawOther)) {
+      setEquippedOtherStats({ base: rawOther as string[], secondary: [] });
+    } else {
+      setEquippedOtherStats(rawOther);
+    }
 
     const newInputs = { ...preset.inputs };
     setInputs(newInputs);
@@ -730,36 +791,106 @@ function App() {
   };
 
 
-  // Apply equipped gear/other stat stats on load
+  // Apply equipped gear/other stat stats - DUAL-SLOT LOGIC
+  // ALL contributions flow through _mod (identical to old behavior for correct calculation)
+  // gearBaseContributions is computed as a DISPLAY-ONLY side product:
+  //   - Display base = rawInput + gearBaseContributions (hides base-slot items from green/red)
+  //   - Display modifier = _mod - gearBaseContributions (shows only delta/secondary as green/red)
   useEffect(() => {
-    // Calculate final modifiers from valid equipped gears and other stats
     const allModifiers: Record<string, number> = {};
+    const baseContributions: Record<string, number> = {};
+    const validGears = Array.isArray(gears) ? gears : [];
+    const validEquippedGears = (equippedGears && typeof equippedGears === 'object' && !Array.isArray(equippedGears)) ? equippedGears : {};
 
-    // Gears
-    (Array.isArray(equippedGears) ? equippedGears : []).forEach(gearId => {
-      const gear = (Array.isArray(gears) ? gears : []).find(g => g.id === gearId);
-      if (gear) {
-        Object.entries(gear.stats).forEach(([stat, value]) => {
-          if (value && value !== 0 && stat !== 'totalPatk') {
-            allModifiers[stat] = (allModifiers[stat] || 0) + value;
+    const addStat = (stat: string, value: number) => {
+      if (value && value !== 0 && stat !== 'totalPatk') {
+        allModifiers[stat] = (allModifiers[stat] || 0) + value;
+      }
+    };
+    const addBaseStat = (stat: string, value: number) => {
+      if (value && value !== 0 && stat !== 'totalPatk') {
+        baseContributions[stat] = (baseContributions[stat] || 0) + value;
+      }
+    };
+
+    // Process gear slots with dual-slot logic
+    for (const slotKey in validEquippedGears) {
+      const slot = slotKey as GearSlot;
+      const slotData = validEquippedGears[slot];
+      if (!slotData) continue;
+
+      const baseGear = slotData.base ? validGears.find(g => g.id === slotData.base) : null;
+      const secondaryGear = slotData.secondary ? validGears.find(g => g.id === slotData.secondary) : null;
+
+      if (baseGear && !secondaryGear) {
+        // Only base slot: ALL stats → _mod AND → baseContributions (display hides green/red)
+        Object.entries(baseGear.stats).forEach(([stat, value]) => {
+          addStat(stat, value || 0);
+          addBaseStat(stat, value || 0);
+        });
+      } else if (!baseGear && secondaryGear) {
+        // Only secondary slot: ALL stats → _mod only (green/red shown)
+        Object.entries(secondaryGear.stats).forEach(([stat, value]) => {
+          addStat(stat, value || 0);
+        });
+      } else if (baseGear && secondaryGear) {
+        // Both slots filled:
+        // 1. Base gear's BASE_STAT_KEYS → _mod AND → baseContributions
+        Object.entries(baseGear.stats).forEach(([stat, value]) => {
+          if (value && value !== 0 && stat !== 'totalPatk' && BASE_STAT_KEYS.includes(stat)) {
+            addStat(stat, value);
+            addBaseStat(stat, value);
+          }
+        });
+
+        // 2. Delta (secondary - base) for ALL stats → _mod only (green/red)
+        const allStatKeys = new Set([
+          ...Object.keys(baseGear.stats),
+          ...Object.keys(secondaryGear.stats)
+        ]);
+        allStatKeys.forEach(stat => {
+          if (stat === 'totalPatk') return;
+          const secondaryValue = (secondaryGear.stats as Record<string, number | undefined>)[stat] || 0;
+          const baseValue = (baseGear.stats as Record<string, number | undefined>)[stat] || 0;
+          const delta = secondaryValue - baseValue;
+          if (delta !== 0) {
+            addStat(stat, delta);
           }
         });
       }
-    });
+    }
 
-    // Other Stats
-    (Array.isArray(equippedOtherStats) ? equippedOtherStats : []).forEach(otherStatId => {
-      const otherStat = (Array.isArray(otherStats) ? otherStats : []).find(s => s.id === otherStatId);
+    // Other Stats - dual-slot logic
+    const validOtherStats = Array.isArray(otherStats) ? otherStats : [];
+    const safeEquippedOther = (equippedOtherStats && typeof equippedOtherStats === 'object' && !Array.isArray(equippedOtherStats))
+      ? equippedOtherStats
+      : { base: [], secondary: [] };
+
+    // Base group: stats → _mod AND → baseContributions (display hides green/red)
+    (safeEquippedOther.base || []).forEach(otherStatId => {
+      const otherStat = validOtherStats.find(s => s.id === otherStatId);
       if (otherStat) {
         Object.entries(otherStat.stats).forEach(([stat, value]) => {
-          if (value && value !== 0 && stat !== 'totalPatk') {
-            allModifiers[stat] = (allModifiers[stat] || 0) + value;
-          }
+          addStat(stat, value || 0);
+          addBaseStat(stat, value || 0);
         });
       }
     });
 
-    // Apply all modifiers in a single atomic update
+    // Secondary group: stats → _mod only (green/red shown)
+    (safeEquippedOther.secondary || []).forEach(otherStatId => {
+      const otherStat = validOtherStats.find(s => s.id === otherStatId);
+      if (otherStat) {
+        Object.entries(otherStat.stats).forEach(([stat, value]) => {
+          addStat(stat, value || 0);
+        });
+      }
+    });
+
+    // Update display-only base contributions (NOT used in calculator)
+    setGearBaseContributions(baseContributions);
+
+    // Apply ALL modifiers to _mod inputs (identical to old behavior)
     setInputs((prevInputs: CalculatorInputs) => {
       const newInputs = { ...prevInputs };
 
@@ -770,7 +901,7 @@ function App() {
         }
       }
 
-      // 2. Apply the calculated modifiers
+      // 2. Apply all modifiers
       Object.entries(allModifiers).forEach(([stat, value]) => {
         const modKey = `${stat}_mod` as keyof CalculatorInputs;
         if (modKey in newInputs) {
@@ -792,6 +923,7 @@ function App() {
         equippedGears={equippedGears}
         otherStats={otherStats}
         equippedOtherStats={equippedOtherStats}
+        gearBaseContributions={gearBaseContributions}
         onAddGear={handleAddGear}
         onEditGear={handleEditGear}
         onDeleteGear={handleDeleteGear}
