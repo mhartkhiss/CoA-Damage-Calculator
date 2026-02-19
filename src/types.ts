@@ -160,6 +160,7 @@ export interface Preset {
   equippedGears: EquippedGearSlots;
   equippedOtherStats: EquippedOtherStatSlots;
   resonanceActive: boolean;
+  userModifiers?: Record<string, number>;
 }
 
 export type DialogType = 'alert' | 'confirm' | 'danger';

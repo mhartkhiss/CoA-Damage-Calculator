@@ -89,6 +89,8 @@ function App() {
   const [presets, setPresets] = useLocalStorage<Preset[]>('presets', []);
   const [gearBaseContributions, setGearBaseContributions] = useState<Record<string, number>>({});
   const [activePresetId, setActivePresetId] = useLocalStorage<string | null>('activePresetId', null);
+  // Track user-manually-entered modifier values, separate from gear contributions
+  const [userModifiers, setUserModifiers] = useLocalStorage<Record<string, number>>('userModifiers', {});
 
   const showDialog = (config: Omit<DialogConfig, 'isOpen'>) => {
     setDialog({ ...config, isOpen: true });
@@ -194,7 +196,22 @@ function App() {
   }, [equippedGears, gears, otherStats, equippedOtherStats, setEquippedOtherStats]);
 
   const handleInputChange = (key: keyof CalculatorInputs, value: number) => {
-    updateInput(key, value);
+    const keyStr = key as string;
+    if (keyStr.endsWith('_mod')) {
+      // User is manually editing a modifier input — store only the user's manual portion
+      // Current _mod = gearContribution + oldUserModifier
+      // gearContribution = current _mod - oldUserModifier
+      // newUserModifier = newValue - gearContribution
+      const statKey = keyStr.replace('_mod', '');
+      const currentModValue = inputs[key] || 0;
+      const oldUserModifier = userModifiers[statKey] || 0;
+      const gearContribution = currentModValue - oldUserModifier;
+      const newUserModifier = value - gearContribution;
+      setUserModifiers(prev => ({ ...prev, [statKey]: newUserModifier }));
+      // Don't call updateInput directly; the gear useEffect will recalculate _mod = gear + user
+    } else {
+      updateInput(key, value);
+    }
     setActivePresetId(null); // Any manual input change invalidates the active preset
   };
 
@@ -214,29 +231,28 @@ function App() {
           updateInput(key as keyof CalculatorInputs, defaultInputs[key as keyof CalculatorInputs]);
         });
         setResonanceActive(false);
+        setUserModifiers({});
         setActivePresetId(null);
       }
     });
   };
 
   const handleResetModifiers = () => {
-    const modifierKeys = inputKeys.filter(key => key.endsWith('_mod'));
-    modifierKeys.forEach(key => {
-      updateInput(key, 0);
-    });
+    setUserModifiers({});
     setActivePresetId(null); // Resetting modifiers invalidates the active preset
   };
 
   const handleExportData = () => {
     const exportData = {
-      version: '3.0', // Bump version for dual-slot Other Stats & base merge
+      version: '3.1', // Bump version for userModifiers support
       exportDate: new Date().toISOString(),
       calculatorInputs: inputs,
       resonanceActive,
       gears,
       equippedGears,
       otherStats,
-      equippedOtherStats
+      equippedOtherStats,
+      userModifiers
     };
 
     const dataStr = JSON.stringify(exportData, null, 2);
@@ -323,6 +339,13 @@ function App() {
               }
 
               setActivePresetId(null); // Imported data means no active preset
+
+              // Import user modifiers
+              if (importedData.userModifiers && typeof importedData.userModifiers === 'object') {
+                setUserModifiers(importedData.userModifiers);
+              } else {
+                setUserModifiers({});
+              }
 
               showDialog({
                 title: 'Success',
@@ -511,12 +534,9 @@ function App() {
       type: 'danger',
       confirmText: 'Unequip All',
       onConfirm: () => {
-        const modifierKeys = Object.keys(inputs).filter(key => key.endsWith('_mod')) as (keyof CalculatorInputs)[];
-        modifierKeys.forEach(key => {
-          updateInput(key, 0);
-        });
         setEquippedGears({});
         setEquippedOtherStats({ base: [], secondary: [] });
+        setUserModifiers({});
         setActivePresetId(null);
       }
     });
@@ -570,6 +590,7 @@ function App() {
         setEquippedGears({});
         setEquippedOtherStats({ base: [], secondary: [] });
         setGearBaseContributions({});
+        setUserModifiers({});
         setActivePresetId(null);
       }
     });
@@ -657,6 +678,7 @@ function App() {
         setEquippedGears({});
         setEquippedOtherStats({ base: [], secondary: [] });
         setGearBaseContributions({});
+        setUserModifiers({});
         setActivePresetId(null);
       }
     });
@@ -705,7 +727,14 @@ function App() {
 
     const resonanceMatch = preset.resonanceActive === resonanceActive;
 
-    return !(inputsMatch && gearsMatch && otherStatsMatch && resonanceMatch);
+    // Compare userModifiers
+    const presetUserMods = preset.userModifiers || {};
+    const presetModKeys = Object.keys(presetUserMods).filter(k => (presetUserMods[k] || 0) !== 0);
+    const currentModKeys = Object.keys(userModifiers).filter(k => (userModifiers[k] || 0) !== 0);
+    const userModsMatch = presetModKeys.length === currentModKeys.length &&
+      presetModKeys.every(k => Math.abs((presetUserMods[k] || 0) - (userModifiers[k] || 0)) < 0.001);
+
+    return !(inputsMatch && gearsMatch && otherStatsMatch && resonanceMatch && userModsMatch);
   };
 
   const handleSavePreset = (name: string) => {
@@ -715,7 +744,8 @@ function App() {
       inputs: { ...inputs },
       equippedGears: JSON.parse(JSON.stringify(equippedGears)), // deep clone
       equippedOtherStats: JSON.parse(JSON.stringify(equippedOtherStats)),
-      resonanceActive
+      resonanceActive,
+      userModifiers: JSON.parse(JSON.stringify(userModifiers)),
     };
     setPresets([...presets, newPreset]);
     setActivePresetId(newPreset.id);
@@ -723,6 +753,9 @@ function App() {
 
   const forceLoadPreset = (preset: Preset) => {
     setResonanceActive(preset.resonanceActive);
+
+    // Restore user modifiers (backward compat: default to empty if not present)
+    setUserModifiers(preset.userModifiers || {});
 
     // Handle backward compatibility for equippedGears
     if (Array.isArray(preset.equippedGears)) {
@@ -890,7 +923,7 @@ function App() {
     // Update display-only base contributions (NOT used in calculator)
     setGearBaseContributions(baseContributions);
 
-    // Apply ALL modifiers to _mod inputs (identical to old behavior)
+    // Apply ALL modifiers to _mod inputs: gear contributions + user manual modifiers
     setInputs((prevInputs: CalculatorInputs) => {
       const newInputs = { ...prevInputs };
 
@@ -901,18 +934,26 @@ function App() {
         }
       }
 
-      // 2. Apply all modifiers
+      // 2. Apply gear/other stat contributions
       Object.entries(allModifiers).forEach(([stat, value]) => {
         const modKey = `${stat}_mod` as keyof CalculatorInputs;
         if (modKey in newInputs) {
-          (newInputs as any)[modKey] = value;
+          (newInputs as any)[modKey] = (newInputs as any)[modKey] + value;
+        }
+      });
+
+      // 3. Apply user-manually-entered modifier values on top
+      Object.entries(userModifiers).forEach(([stat, value]) => {
+        const modKey = `${stat}_mod` as keyof CalculatorInputs;
+        if (modKey in newInputs && value !== 0) {
+          (newInputs as any)[modKey] = (newInputs as any)[modKey] + value;
         }
       });
 
       return newInputs;
     });
 
-  }, [equippedGears, gears, equippedOtherStats, otherStats, setInputs]);
+  }, [equippedGears, gears, equippedOtherStats, otherStats, userModifiers, setInputs]);
 
   return (
     <div className="container">
