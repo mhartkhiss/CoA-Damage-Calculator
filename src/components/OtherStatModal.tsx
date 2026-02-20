@@ -7,6 +7,7 @@ interface OtherStatModalProps {
     onSave: (otherStat: Omit<OtherStat, 'id'>) => void;
     editingOtherStat?: OtherStat | null;
     gears: Gear[];
+    otherStats?: OtherStat[];
 }
 
 const statLabels: Record<string, string> = {
@@ -64,7 +65,8 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
     onClose,
     onSave,
     editingOtherStat,
-    gears
+    gears,
+    otherStats = []
 }) => {
     const [itemName, setItemName] = useState('');
     const [stats, setStats] = useState<GearStats>({});
@@ -74,6 +76,7 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
     const [requiredGearCount, setRequiredGearCount] = useState<number>(0);
     const [gearSearch, setGearSearch] = useState('');
     const [isGearModalOpen, setIsGearModalOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<'gears' | 'otherStats'>('gears');
 
     useEffect(() => {
         if (editingOtherStat) {
@@ -162,6 +165,11 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
         slotLabels[gear.slot].toLowerCase().includes(gearSearch.toLowerCase())
     );
 
+    const filteredOtherStats = otherStats.filter(stat =>
+        stat.id !== editingOtherStat?.id &&
+        stat.name.toLowerCase().includes(gearSearch.toLowerCase())
+    );
+
     if (!isOpen) return null;
 
     return (
@@ -211,9 +219,9 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
                                     }}>
                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                                             {requiredGearIds.length === 0 ? (
-                                                'No gears selected for this condition.'
+                                                'No items selected for this condition.'
                                             ) : (
-                                                `Selected: ${requiredGearIds.length} gear(s)`
+                                                `Selected: ${requiredGearIds.length} item(s)`
                                             )}
                                         </div>
                                         <button
@@ -222,13 +230,13 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
                                             style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-default)' }}
                                             onClick={() => setIsGearModalOpen(true)}
                                         >
-                                            {requiredGearIds.length === 0 ? 'Select Required Gears' : 'Modify Gear Selection'}
+                                            {requiredGearIds.length === 0 ? 'Select Required Items' : 'Modify Item Selection'}
                                         </button>
 
                                         {requiredGearIds.length > 0 && (
                                             <div style={{ marginTop: '5px' }}>
                                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                                    Minimum Required Gears to Equip:
+                                                    Minimum Required Items to Equip:
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                     <input
@@ -246,7 +254,7 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
                                                         max={requiredGearIds.length}
                                                         style={{ width: '80px', padding: '6px' }}
                                                     />
-                                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>out of {requiredGearIds.length} gear(s)</span>
+                                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>out of {requiredGearIds.length} item(s)</span>
                                                 </div>
                                             </div>
                                         )}
@@ -312,14 +320,30 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
                 <div className="modal active" style={{ zIndex: 2100 }}>
                     <div className="modal-content" style={{ maxWidth: '500px' }}>
                         <div className="modal-header">
-                            <h2>Select Required Gears</h2>
+                            <h2>Select Required Items</h2>
                             <button className="close-modal" onClick={() => setIsGearModalOpen(false)}>&times;</button>
                         </div>
                         <div className="modal-scroll-content">
                             <div className="gear-search-container" style={{ marginBottom: '15px' }}>
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab('gears')}
+                                        style={{ flex: 1, padding: '8px', cursor: 'pointer', borderRadius: 'var(--radius-sm)', background: activeTab === 'gears' ? 'var(--primary-color)' : 'var(--bg-input)', border: 'none', color: activeTab === 'gears' ? '#fff' : 'var(--text-secondary)' }}
+                                    >
+                                        Gears
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab('otherStats')}
+                                        style={{ flex: 1, padding: '8px', cursor: 'pointer', borderRadius: 'var(--radius-sm)', background: activeTab === 'otherStats' ? 'var(--primary-color)' : 'var(--bg-input)', border: 'none', color: activeTab === 'otherStats' ? '#fff' : 'var(--text-secondary)' }}
+                                    >
+                                        Other Stats
+                                    </button>
+                                </div>
                                 <input
                                     type="text"
-                                    placeholder="Search gears by name or slot..."
+                                    placeholder={activeTab === 'gears' ? "Search gears by name or slot..." : "Search other stats by name..."}
                                     value={gearSearch}
                                     onChange={(e) => setGearSearch(e.target.value)}
                                     className="gear-search-input"
@@ -328,24 +352,46 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
                             </div>
 
                             <div className="gears-selection-list">
-                                {gears.length === 0 ? (
-                                    <div className="no-gears-msg">No gears created yet. Create gears first to set conditions.</div>
-                                ) : filteredGears.length === 0 ? (
-                                    <div className="no-gears-msg">No gears match your search.</div>
+                                {activeTab === 'gears' ? (
+                                    gears.length === 0 ? (
+                                        <div className="no-gears-msg">No gears created yet. Create gears first to set conditions.</div>
+                                    ) : filteredGears.length === 0 ? (
+                                        <div className="no-gears-msg">No gears match your search.</div>
+                                    ) : (
+                                        <div className="gears-selection-grid">
+                                            {filteredGears.map(gear => (
+                                                <div
+                                                    key={gear.id}
+                                                    className={`gear-select-item ${requiredGearIds.includes(gear.id) ? 'selected' : ''}`}
+                                                    onClick={() => toggleGearSelection(gear.id)}
+                                                >
+                                                    <span className="gear-select-slot">[{slotLabels[gear.slot]}]</span>
+                                                    <span className="gear-select-name">{gear.name}</span>
+                                                    <span className="gear-select-check">{requiredGearIds.includes(gear.id) ? '✓' : ''}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )
                                 ) : (
-                                    <div className="gears-selection-grid">
-                                        {filteredGears.map(gear => (
-                                            <div
-                                                key={gear.id}
-                                                className={`gear-select-item ${requiredGearIds.includes(gear.id) ? 'selected' : ''}`}
-                                                onClick={() => toggleGearSelection(gear.id)}
-                                            >
-                                                <span className="gear-select-slot">[{slotLabels[gear.slot]}]</span>
-                                                <span className="gear-select-name">{gear.name}</span>
-                                                <span className="gear-select-check">{requiredGearIds.includes(gear.id) ? '✓' : ''}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    otherStats.length === 0 || (otherStats.length === 1 && otherStats[0].id === editingOtherStat?.id) ? (
+                                        <div className="no-gears-msg">No other stats available to set as conditions.</div>
+                                    ) : filteredOtherStats.length === 0 ? (
+                                        <div className="no-gears-msg">No other stats match your search.</div>
+                                    ) : (
+                                        <div className="gears-selection-grid">
+                                            {filteredOtherStats.map(stat => (
+                                                <div
+                                                    key={stat.id}
+                                                    className={`gear-select-item ${requiredGearIds.includes(stat.id) ? 'selected' : ''}`}
+                                                    onClick={() => toggleGearSelection(stat.id)}
+                                                >
+                                                    <span className="gear-select-slot">[Other]</span>
+                                                    <span className="gear-select-name">{stat.name}</span>
+                                                    <span className="gear-select-check">{requiredGearIds.includes(stat.id) ? '✓' : ''}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )
                                 )}
                             </div>
                         </div>

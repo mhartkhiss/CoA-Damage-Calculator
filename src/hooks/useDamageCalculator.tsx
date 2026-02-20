@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { CalculatorInputs } from '../types';
+import type { CalculatorInputs, GearStats } from '../types';
 import { formatStatValue } from '../utils/formatUtils';
 
 export const useDamageCalculator = (inputs: CalculatorInputs, resonanceActive: boolean, gearBaseContributions: Record<string, number> = {}) => {
@@ -164,6 +164,56 @@ export const useDamageCalculator = (inputs: CalculatorInputs, resonanceActive: b
         const hasModifiers = hasDisplayModifiers;
         const percentageIncrease = hasModifiers ? ((finalDamage - baseDamage) / baseDamage * 100) : 0;
 
+        const calculateSecondaryGearImpact = (gearStats: Partial<GearStats> | Record<string, number>): number => {
+            const getVal = (baseId: keyof CalculatorInputs, modId?: keyof CalculatorInputs): number => {
+                const baseValue = inputs[baseId] || 0;
+                const modifierValue = modId ? (inputs[modId] || 0) : 0;
+                const reduction = (gearStats as any)[baseId] || 0;
+                return baseValue + modifierValue - reduction;
+            };
+
+            const tBaseAtk = calculatedBaseAtkValue + (inputs.baseAtk_mod || 0) - ((gearStats as any)['baseAtk'] || 0);
+            const tAtkPercent = getVal('atkPercent', 'atkPercent_mod');
+            const tStrength = getVal('strength', 'strength_mod');
+            const tStrengthPercent = getVal('strengthPercent', 'strengthPercent_mod');
+
+            const effStrength = tStrength * (1 + tStrengthPercent / 100);
+            const effTotalPatk = tBaseAtk > 0
+                ? calculateTotalAtk(tBaseAtk, tAtkPercent, effStrength)
+                : ((inputs.totalPatk || 0) - ((gearStats as any)['totalPatk'] || 0));
+
+            const totalPatk = effTotalPatk;
+            const totalDamageReduction = getVal('damageReduction', 'damageReduction_mod') / 100;
+            const totalPhysicalPen = getVal('physicalPen', 'physicalPen_mod') / 100;
+
+            const tDef = Math.round((3000 * totalDamageReduction) / (1 - totalDamageReduction));
+            const tEffDef = Math.round(tDef * (1 - totalPhysicalPen));
+            const tRed = tEffDef / (3000 + tEffDef);
+
+            const pdefShred = getVal('pdefShred', 'pdefShred_mod');
+            const actAtk = totalPatk * (1 - tRed) + pdefShred;
+
+            const skillMulti = getVal('skillMultiplier', 'skillMultiplier_mod') / 100;
+            const critDmg = getVal('critDmg', 'critDmg_mod') / 100;
+            const elementalEnh = getVal('elementalEnh', 'elementalEnh_mod');
+            const eleDmg = (elementalEnh / 11) * 0.05;
+
+            const skillDmg = getVal('skillDmg', 'skillDmg_mod') / 100;
+            const dmgBonus = getVal('dmgBonus', 'dmgBonus_mod') / 100;
+            const dmgToX = (getVal('dmgToBoss', 'dmgToBoss_mod') + getVal('dmgToBeast', 'dmgToBeast_mod') + getVal('dmgToMech', 'dmgToMech_mod') + getVal('dmgToDecayed', 'dmgToDecayed_mod') + getVal('dmgToOtherworld', 'dmgToOtherworld_mod') + getVal('dmgToDebuffed', 'dmgToDebuffed_mod') + getVal('dmgToScorched', 'dmgToScorched_mod') + getVal('dmgToPoisoned', 'dmgToPoisoned_mod') + getVal('dmgToBleeding', 'dmgToBleeding_mod') + getVal('dmgToVulnerable', 'dmgToVulnerable_mod') + getVal('dmgToSlowed', 'dmgToSlowed_mod') + getVal('dmgToExhausted', 'dmgToExhausted_mod')) / 100;
+
+            const dmgDuringResonance = getVal('dmgDuringResonance', 'dmgDuringResonance_mod') / 100;
+            const resFactor = resonanceActive ? (1 + 0.20 + dmgDuringResonance) : 1;
+            const addDmg = getVal('additionalDmg', 'additionalDmg_mod') / 100;
+
+            const fDmgBeforeAdd = actAtk * (1 + skillMulti) * (1 + critDmg) * (1 + eleDmg) * (1 + skillDmg) * (1 + dmgBonus) * (1 + dmgToX) * resFactor;
+
+            const localFinalDamage = fDmgBeforeAdd * (1 + addDmg);
+            if (localFinalDamage === 0) return 0;
+
+            return ((finalDamage - localFinalDamage) / localFinalDamage) * 100;
+        };
+
         return {
             actualAttack: actualAtk,
             baseDamage,
@@ -174,7 +224,8 @@ export const useDamageCalculator = (inputs: CalculatorInputs, resonanceActive: b
             penTooltip: `Effective Defense: ${effectiveDefense.toLocaleString()}\nFinal Reduction: ${formatStatValue(actualDamageReduction * 100)}%`,
             elementalDmg,
             calculatedBaseAtk,
-            effectiveTotalPatk
+            effectiveTotalPatk,
+            calculateSecondaryGearImpact
         };
     }, [inputs, resonanceActive, gearBaseContributions]);
 

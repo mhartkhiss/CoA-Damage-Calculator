@@ -189,4 +189,5 @@ export interface CalculationResults {
   elementalDmg: number;
   calculatedBaseAtk: number | null;
   effectiveTotalPatk: number;
+  calculateSecondaryGearImpact: (gearStats: Partial<GearStats> | Record<string, number>) => number;
 }

@@ -482,9 +482,26 @@ const GearManagement: React.FC<GearManagementProps> = ({
                         {secondaryGear?.image && (
                           <img src={secondaryGear.image} alt="" className="sub-slot-icon" />
                         )}
-                        <span className="sub-slot-gear-name" title={secondaryGear ? secondaryGear.name : 'Empty'}>
+                        <span className="sub-slot-gear-name" title={secondaryGear ? secondaryGear.name : 'Empty'} style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {secondaryGear ? secondaryGear.name : 'Empty'}
                         </span>
+                        {(() => {
+                          if (!secondaryGear) return null;
+                          const impact = results.calculateSecondaryGearImpact(secondaryGear.stats);
+                          return (
+                            <span
+                              style={{
+                                marginLeft: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                color: impact >= 0 ? 'var(--success)' : 'var(--danger)'
+                              }}
+                              title="Individual contribution to final damage"
+                            >
+                              {impact > 0 ? '+' : ''}{formatStatValue(impact)}%
+                            </span>
+                          );
+                        })()}
                         {secondaryGear && (
                           <button
                             className="sub-slot-reset-btn"
@@ -500,6 +517,68 @@ const GearManagement: React.FC<GearManagementProps> = ({
                       </div>
                     </div>
                   </div>
+
+                  {/* Hover UI */}
+                  <div className="slot-hover-dropdown">
+                    <div className="hover-dropdown-header">{slotLabels[slot]} Gears</div>
+                    <div className="hover-dropdown-list">
+                      {gears.filter(g => g.slot === slot).length === 0 ? (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px' }}>
+                          No gears found for this slot.
+                        </div>
+                      ) : (
+                        gears.filter(g => g.slot === slot).map(gear => {
+                          const isBase = baseGear?.id === gear.id;
+                          const isSec = secondaryGear?.id === gear.id;
+                          return (
+                            <div key={gear.id} className="hover-gear-item">
+                              {gear.image ? (
+                                <img src={gear.image} alt={gear.name} className="hover-gear-icon" />
+                              ) : (
+                                <div className="hover-gear-icon-placeholder" />
+                              )}
+                              <div className="hover-gear-info">
+                                <span className="hover-gear-name" title={gear.name}>{gear.name}</span>
+                                <div className="hover-gear-actions">
+                                  {isBase ? (
+                                    <button
+                                      className="hover-btn unequip"
+                                      onClick={(e) => { e.stopPropagation(); onUnequipGear(gear.id); }}
+                                    >
+                                      Unequip B
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="hover-btn"
+                                      onClick={(e) => { e.stopPropagation(); onEquipGear(gear.id, 'base'); }}
+                                    >
+                                      Equip B
+                                    </button>
+                                  )}
+                                  {isSec ? (
+                                    <button
+                                      className="hover-btn unequip"
+                                      onClick={(e) => { e.stopPropagation(); onUnequipGear(gear.id); }}
+                                    >
+                                      Unequip S
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="hover-btn"
+                                      onClick={(e) => { e.stopPropagation(); onEquipGear(gear.id, 'secondary'); }}
+                                    >
+                                      Equip S
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               );
             })}
@@ -939,6 +1018,7 @@ const GearManagement: React.FC<GearManagementProps> = ({
         onSave={handleSaveOtherStat}
         editingOtherStat={editingOtherStat}
         gears={gears}
+        otherStats={otherStats}
       />
 
       {/* Slot Selection Modal - Dual Slot System */}

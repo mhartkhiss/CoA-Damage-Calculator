@@ -170,18 +170,33 @@ function App() {
 
       stat.requiredGearIds!.forEach(requiredId => {
         const gear = validGears.find(g => g.id === requiredId);
-        if (!gear) return;
-        const slotData = validEquippedGears[gear.slot];
-        if (!slotData) return;
+        if (gear) {
+          const slotData = validEquippedGears[gear.slot];
+          if (!slotData) return;
 
-        const isInBase = slotData.base === requiredId;
-        const isInSecondary = slotData.secondary === requiredId;
+          const isInBase = slotData.base === requiredId;
+          const isInSecondary = slotData.secondary === requiredId;
 
-        if (isInBase && !slotData.secondary) {
-          activeBaseCount++;
+          if (isInBase && !slotData.secondary) {
+            activeBaseCount++;
+          }
+          if (isInSecondary) {
+            activeSecondaryCount++;
+          }
+          return;
         }
-        if (isInSecondary) {
-          activeSecondaryCount++;
+
+        const isOtherStat = validOtherStats.some(os => os.id === requiredId);
+        if (isOtherStat) {
+          const isInBase = safeEquippedOther.base.includes(requiredId);
+          const isInSecondary = safeEquippedOther.secondary.includes(requiredId);
+
+          if (isInBase) {
+            activeBaseCount++;
+          }
+          if (isInSecondary) {
+            activeSecondaryCount++;
+          }
         }
       });
 
