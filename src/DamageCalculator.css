@@ -1445,7 +1445,7 @@ button:active {
 }
 
 .actual-attack-header h3 {
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   color: var(--text-secondary);
   margin: 0 0 4px 0;
   font-weight: 700;
@@ -1454,7 +1454,7 @@ button:active {
 }
 
 .actual-attack-value {
-  font-size: 1.8rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: var(--text-primary);
   margin-bottom: 2px;
