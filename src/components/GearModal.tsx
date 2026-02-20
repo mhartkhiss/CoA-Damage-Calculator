@@ -73,20 +73,30 @@ const resizeImage = (file: File): Promise<string> => {
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
+        const size = Math.min(img.width, img.height);
+        // Do not upscale smaller images to prevent blur. Max size 128px for crisp high-DPI
+        const maxSize = 128;
+        const targetSize = Math.min(size, maxSize);
+
         const canvas = document.createElement('canvas');
-        canvas.width = 75;
-        canvas.height = 75;
+        canvas.width = targetSize;
+        canvas.height = targetSize;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           reject(new Error('Failed to get canvas context'));
           return;
         }
-        // Draw image scaled to 75x75, maintaining aspect ratio via cover
-        const size = Math.min(img.width, img.height);
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // Draw image scaled down or 1:1, maintaining aspect ratio via cover
         const sx = (img.width - size) / 2;
         const sy = (img.height - size) / 2;
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, 75, 75);
-        resolve(canvas.toDataURL('image/webp', 0.8));
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, targetSize, targetSize);
+
+        // Use quality 0.95 to minimize WebP compression blur artifacts
+        resolve(canvas.toDataURL('image/webp', 0.95));
       };
       img.onerror = () => reject(new Error('Failed to load image'));
       img.src = e.target?.result as string;

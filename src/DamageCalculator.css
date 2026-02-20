@@ -615,6 +615,7 @@ input[type="number"].modifier-input {
   gap: 8px;
   justify-content: center;
   align-items: center;
+  flex-wrap: wrap;
   margin-top: 0;
   margin-bottom: 8px;
   padding: 8px;
@@ -625,6 +626,11 @@ input[type="number"].modifier-input {
   width: 100%;
   max-width: 100%;
   flex-shrink: 0;
+}
+
+.compact-buttons button {
+  padding: 6px 10px;
+  font-size: 0.75rem;
 }
 
 button {
@@ -2660,12 +2666,13 @@ button:active {
    Gear Icon in Slot Overview Grid
    ============================================ */
 .slot-gear-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 55px;
+  height: 55px;
+  flex-shrink: 0;
+  border-radius: 8px;
   object-fit: cover;
   border: 1px solid var(--border-subtle);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 /* Inline icon in sub-slot lines */

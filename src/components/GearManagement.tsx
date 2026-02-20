@@ -430,18 +430,6 @@ const GearManagement: React.FC<GearManagementProps> = ({
   return (
     <>
       <div className="gear-section">
-        <div className="gear-header">
-          <div className="button-group">
-            <button onClick={onResetDefaults}>Reset to Defaults</button>
-            <button className="reset-mod-btn" onClick={onResetModifiers}>Reset Increase</button>
-            <button className="merge-btn" onClick={onMergeStats}>Merge Increase</button>
-            <button className="reverse-merge-btn" onClick={onReverseMergeStats}>Reverse Merge</button>
-            <button className="unequip-all-btn" onClick={onUnequipAll}>Unequip All</button>
-            <button className="preset-btn" onClick={() => setIsPresetModalOpen(true)}>Presets</button>
-            <button className="import-btn" onClick={onImportData}>Import</button>
-            <button className="export-btn" onClick={onExportData}>Export</button>
-          </div>
-        </div>
 
         {/* Slot Overview Grid */}
         <div className="slot-overview">
@@ -569,6 +557,16 @@ const GearManagement: React.FC<GearManagementProps> = ({
             {/* Stats Display - Center Column */}
             <div className="stats-display-container">
               <div className="stats-display-header">
+                <div className="button-group compact-buttons">
+                  <button onClick={onResetDefaults}>Reset to Defaults</button>
+                  <button className="reset-mod-btn" onClick={onResetModifiers}>Reset Increase</button>
+                  <button className="merge-btn" onClick={onMergeStats}>Merge Increase</button>
+                  <button className="reverse-merge-btn" onClick={onReverseMergeStats}>Reverse Merge</button>
+                  <button className="unequip-all-btn" onClick={onUnequipAll}>Unequip All</button>
+                  <button className="preset-btn" onClick={() => setIsPresetModalOpen(true)}>Presets</button>
+                  <button className="import-btn" onClick={onImportData}>Import</button>
+                  <button className="export-btn" onClick={onExportData}>Export</button>
+                </div>
                 <div className="actual-attack-header">
                   <h3>Actual Attack</h3>
                   <div className="actual-attack-value">{Math.round(results.actualAttack).toLocaleString()}</div>
