@@ -71,6 +71,7 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
     const [inputValues, setInputValues] = useState<Record<string, string>>({});
     const [isSetEffect, setIsSetEffect] = useState(false);
     const [requiredGearIds, setRequiredGearIds] = useState<string[]>([]);
+    const [requiredGearCount, setRequiredGearCount] = useState<number>(0);
     const [gearSearch, setGearSearch] = useState('');
     const [isGearModalOpen, setIsGearModalOpen] = useState(false);
 
@@ -80,6 +81,7 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
             setStats(editingOtherStat.stats);
             setIsSetEffect(editingOtherStat.isSetEffect || false);
             setRequiredGearIds(editingOtherStat.requiredGearIds || []);
+            setRequiredGearCount(editingOtherStat.requiredGearCount || editingOtherStat.requiredGearIds?.length || 0);
             // Initialize input values from stats
             const initialInputs: Record<string, string> = {};
             Object.entries(editingOtherStat.stats).forEach(([key, value]) => {
@@ -92,6 +94,7 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
             setInputValues({});
             setIsSetEffect(false);
             setRequiredGearIds([]);
+            setRequiredGearCount(0);
         }
         setGearSearch('');
     }, [editingOtherStat, isOpen]); // Reset when opening new
@@ -113,7 +116,8 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
             name: itemName.trim(),
             stats,
             isSetEffect,
-            requiredGearIds: isSetEffect ? requiredGearIds : []
+            requiredGearIds: isSetEffect ? requiredGearIds : [],
+            requiredGearCount: isSetEffect ? Math.max(1, requiredGearCount) : undefined
         });
 
         setItemName('');
@@ -121,6 +125,7 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
         setInputValues({});
         setIsSetEffect(false);
         setRequiredGearIds([]);
+        setRequiredGearCount(0);
         onClose();
     };
 
@@ -138,11 +143,18 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
     };
 
     const toggleGearSelection = (gearId: string) => {
-        setRequiredGearIds(prev =>
-            prev.includes(gearId)
-                ? prev.filter(id => id !== gearId)
-                : [...prev, gearId]
-        );
+        const hasId = requiredGearIds.includes(gearId);
+        const nextIds = hasId
+            ? requiredGearIds.filter(id => id !== gearId)
+            : [...requiredGearIds, gearId];
+
+        setRequiredGearIds(nextIds);
+
+        if (hasId && requiredGearCount > nextIds.length) {
+            setRequiredGearCount(nextIds.length);
+        } else if (!hasId && requiredGearCount === requiredGearIds.length) {
+            setRequiredGearCount(nextIds.length);
+        }
     };
 
     const filteredGears = gears.filter(gear =>
@@ -212,6 +224,32 @@ const OtherStatModal: React.FC<OtherStatModalProps> = ({
                                         >
                                             {requiredGearIds.length === 0 ? 'Select Required Gears' : 'Modify Gear Selection'}
                                         </button>
+
+                                        {requiredGearIds.length > 0 && (
+                                            <div style={{ marginTop: '5px' }}>
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                                                    Minimum Required Gears to Equip:
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <input
+                                                        type="number"
+                                                        value={requiredGearCount || ''}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value);
+                                                            if (!isNaN(val)) {
+                                                                setRequiredGearCount(Math.min(Math.max(1, val), requiredGearIds.length));
+                                                            } else {
+                                                                setRequiredGearCount(0);
+                                                            }
+                                                        }}
+                                                        min={1}
+                                                        max={requiredGearIds.length}
+                                                        style={{ width: '80px', padding: '6px' }}
+                                                    />
+                                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>out of {requiredGearIds.length} gear(s)</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

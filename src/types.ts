@@ -80,6 +80,7 @@ export interface OtherStat {
   stats: GearStats;
   isSetEffect?: boolean;
   requiredGearIds?: string[];
+  requiredGearCount?: number;
 }
 
 // Dual-slot system for Other Stats: base group merges to base values, secondary group goes to modifiers

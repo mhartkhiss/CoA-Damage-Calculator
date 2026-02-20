@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaEdit, FaTrash, FaGripVertical } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaGripVertical, FaFileImport, FaFileExport, FaSync, FaUndo, FaCompress, FaExpand, FaBan, FaBookmark } from 'react-icons/fa';
 import type { Gear, GearSlot, CalculatorInputs, CalculationResults, OtherStat, Preset, DialogConfig, EquippedGearSlots, EquippedOtherStatSlots } from '../types';
 import { countEquippedGears } from '../types';
 
@@ -558,14 +558,14 @@ const GearManagement: React.FC<GearManagementProps> = ({
             <div className="stats-display-container">
               <div className="stats-display-header">
                 <div className="button-group compact-buttons">
-                  <button onClick={onResetDefaults}>Reset to Defaults</button>
-                  <button className="reset-mod-btn" onClick={onResetModifiers}>Reset Increase</button>
-                  <button className="merge-btn" onClick={onMergeStats}>Merge Increase</button>
-                  <button className="reverse-merge-btn" onClick={onReverseMergeStats}>Reverse Merge</button>
-                  <button className="unequip-all-btn" onClick={onUnequipAll}>Unequip All</button>
-                  <button className="preset-btn" onClick={() => setIsPresetModalOpen(true)}>Presets</button>
-                  <button className="import-btn" onClick={onImportData}>Import</button>
-                  <button className="export-btn" onClick={onExportData}>Export</button>
+                  <button onClick={onResetDefaults} title="Reset to Defaults"><FaSync size={16} /></button>
+                  <button className="reset-mod-btn" onClick={onResetModifiers} title="Reset Increase"><FaUndo size={16} /></button>
+                  <button className="merge-btn" onClick={onMergeStats} title="Merge Increase"><FaCompress size={16} /></button>
+                  <button className="reverse-merge-btn" onClick={onReverseMergeStats} title="Reverse Merge"><FaExpand size={16} /></button>
+                  <button className="unequip-all-btn" onClick={onUnequipAll} title="Unequip All"><FaBan size={16} /></button>
+                  <button className="preset-btn" onClick={() => setIsPresetModalOpen(true)} title="Presets"><FaBookmark size={16} /></button>
+                  <button className="import-btn" onClick={onImportData} title="Import Data"><FaFileImport size={16} /></button>
+                  <button className="export-btn" onClick={onExportData} title="Export Data"><FaFileExport size={16} /></button>
                 </div>
                 <div className="actual-attack-header">
                   <h3>Actual Attack</h3>
@@ -853,7 +853,12 @@ const GearManagement: React.FC<GearManagementProps> = ({
                         </div>
                         <div className="slot-gear-actions">
                           {otherStat.isSetEffect ? (
-                            <div className="set-effect-auto-badge">SET EFFECT (AUTO)</div>
+                            <div className="set-effect-auto-badge">
+                              SET EFFECT (AUTO)
+                              <span style={{ display: 'block', fontSize: '0.8em', opacity: 0.8, marginTop: '2px' }}>
+                                Requires {otherStat.requiredGearCount || otherStat.requiredGearIds?.length || 0} gear(s)
+                              </span>
+                            </div>
                           ) : isEquipped ? (
                             <button
                               className="slot-gear-btn unequip-btn"

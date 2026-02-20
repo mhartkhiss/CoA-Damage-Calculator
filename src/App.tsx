@@ -162,42 +162,63 @@ function App() {
 
     let modified = false;
     const newBaseList = [...(safeEquippedOther.base || [])];
+    const newSecondaryList = [...(safeEquippedOther.secondary || [])];
 
     setEffectStats.forEach(stat => {
-      // Check: all required gears must be equipped (base or secondary)
-      // Breaking: if a required gear is in the base slot AND a different secondary is also in that slot
-      const isSetActive = stat.requiredGearIds!.every(requiredId => {
+      let activeBaseCount = 0;
+      let activeSecondaryCount = 0;
+
+      stat.requiredGearIds!.forEach(requiredId => {
         const gear = validGears.find(g => g.id === requiredId);
-        if (!gear) return false;
+        if (!gear) return;
         const slotData = validEquippedGears[gear.slot];
-        if (!slotData) return false;
+        if (!slotData) return;
 
         const isInBase = slotData.base === requiredId;
         const isInSecondary = slotData.secondary === requiredId;
-        // Must be equipped in at least one sub-slot
-        if (!isInBase && !isInSecondary) return false;
-        // If the required gear is in base and a secondary exists, the set breaks
-        if (isInBase && slotData.secondary) return false;
 
-        return true;
+        if (isInBase && !slotData.secondary) {
+          activeBaseCount++;
+        }
+        if (isInSecondary) {
+          activeSecondaryCount++;
+        }
       });
 
-      const isCurrentlyEquipped = newBaseList.includes(stat.id);
+      const requiredCount = stat.requiredGearCount || stat.requiredGearIds!.length;
+      const isSetActiveBase = activeBaseCount >= requiredCount;
+      const isSetActiveSecondary = activeSecondaryCount >= requiredCount;
 
-      if (isSetActive && !isCurrentlyEquipped) {
+      const isCurrentlyEquippedBase = newBaseList.includes(stat.id);
+      const isCurrentlyEquippedSecondary = newSecondaryList.includes(stat.id);
+
+      // Handle Base Set Activation
+      if (isSetActiveBase && !isCurrentlyEquippedBase) {
         newBaseList.push(stat.id);
         modified = true;
-      } else if (!isSetActive && isCurrentlyEquipped) {
+      } else if (!isSetActiveBase && isCurrentlyEquippedBase) {
         const index = newBaseList.indexOf(stat.id);
         if (index > -1) {
           newBaseList.splice(index, 1);
           modified = true;
         }
       }
+
+      // Handle Secondary Set Activation
+      if (isSetActiveSecondary && !isCurrentlyEquippedSecondary) {
+        newSecondaryList.push(stat.id);
+        modified = true;
+      } else if (!isSetActiveSecondary && isCurrentlyEquippedSecondary) {
+        const index = newSecondaryList.indexOf(stat.id);
+        if (index > -1) {
+          newSecondaryList.splice(index, 1);
+          modified = true;
+        }
+      }
     });
 
     if (modified) {
-      setEquippedOtherStats({ ...safeEquippedOther, base: newBaseList });
+      setEquippedOtherStats({ base: newBaseList, secondary: newSecondaryList });
     }
   }, [equippedGears, gears, otherStats, equippedOtherStats, setEquippedOtherStats]);
 
