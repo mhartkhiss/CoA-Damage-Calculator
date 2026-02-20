@@ -1684,15 +1684,7 @@ button:active {
   letter-spacing: 0.1em;
 }
 
-.slot-gear-name {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 110px;
-}
+
 
 .slot-indicator {
   font-size: 1.1rem;
@@ -1740,26 +1732,104 @@ button:active {
 }
 
 .slot-modal {
-  max-width: 700px;
-  max-height: 80vh;
+  max-width: 100%;
+  max-height: 100%;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  margin: 0;
+  animation: none;
 }
 
 .slot-gears-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: 8px 16px;
   min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+/* Drag Handle */
+.drag-handle {
+  position: absolute;
+  top: 16px;
+  left: 14px;
+  color: var(--text-muted);
+  opacity: 0.3;
+  cursor: grab;
+  transition: all 0.2s ease;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.slot-gear-item:hover .drag-handle {
+  opacity: 0.8;
+  color: var(--primary);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Drag-and-drop states */
+.slot-gear-item.dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3) !important;
+}
+
+.slot-gear-item.drag-over {
+  border-color: var(--primary) !important;
+  background: rgba(99, 102, 241, 0.08) !important;
+  box-shadow: 0 0 25px rgba(99, 102, 241, 0.2),
+    inset 0 0 15px rgba(99, 102, 241, 0.05) !important;
+  transform: translateY(-2px) scale(1.01);
+}
+
+.slot-gear-item.drag-over::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  border-radius: 2px;
+  animation: dragIndicatorPulse 1s ease-in-out infinite;
+}
+
+@keyframes dragIndicatorPulse {
+
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 .slot-gear-item {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: 16px 16px 16px 36px;
+  margin-bottom: 0;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.slot-gear-item:hover {
+  z-index: 100;
 }
 
 .slot-gear-item::before {
@@ -1782,8 +1852,7 @@ button:active {
 .slot-gear-item:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: var(--primary-light);
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .slot-gear-item:hover::before {
@@ -1796,17 +1865,11 @@ button:active {
   background: rgba(16, 185, 129, 0.05);
 }
 
-
-.slot-gear-item:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
-}
-
 .slot-gear-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   padding-right: 60px;
   /* Create space for absolute icons */
   position: relative;
@@ -1819,9 +1882,8 @@ button:active {
   letter-spacing: -0.01em;
   color: var(--text-primary);
   flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  word-break: break-word;
 }
 
 
@@ -2494,4 +2556,174 @@ button:active {
   font-style: italic;
   font-size: 0.85rem;
   padding: 20px;
+}
+
+/* ============================================
+   Gear Image Upload in GearModal
+   ============================================ */
+.gear-form-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 15px;
+}
+
+.gear-image-upload {
+  width: 70px;
+  height: 70px;
+  flex-shrink: 0;
+  border: 2px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.gear-image-upload:hover {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.06);
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
+}
+
+.gear-image-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: calc(var(--radius-md) - 2px);
+}
+
+.gear-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-muted);
+}
+
+.gear-image-plus {
+  font-size: 1.4rem;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--primary);
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.gear-image-upload:hover .gear-image-plus {
+  opacity: 1;
+}
+
+.gear-image-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.gear-image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.85);
+  border: none;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.gear-image-upload:hover .gear-image-remove {
+  opacity: 1;
+}
+
+.gear-image-remove:hover {
+  background: rgba(239, 68, 68, 1);
+  transform: scale(1.1);
+}
+
+/* ============================================
+   Gear Icon in Slot Overview Grid
+   ============================================ */
+.slot-gear-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Inline icon in sub-slot lines */
+.sub-slot-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+}
+
+/* ============================================
+   Gear Item Icon in Slot Modal
+   ============================================ */
+.slot-gear-item-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border-default);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Hover-reveal stats in Slot Modal
+   ============================================ */
+/* Hover overlay: stats + actions float below the card without affecting grid row */
+.slot-gear-hover-content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 10;
+  background: #161c26;
+  border: 1px solid var(--border-default);
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+  padding: 10px 16px 12px 16px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.slot-gear-item:hover .slot-gear-hover-content {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.slot-gear-stats-hover {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
 }

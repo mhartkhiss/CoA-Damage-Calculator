@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FaEdit, FaTrash } from 'react-icons/fa';
+import React, { useState, useEffect, useRef } from 'react';
+import { FaEdit, FaTrash, FaGripVertical } from 'react-icons/fa';
 import type { Gear, GearSlot, CalculatorInputs, CalculationResults, OtherStat, Preset, DialogConfig, EquippedGearSlots, EquippedOtherStatSlots } from '../types';
 import { countEquippedGears } from '../types';
 
@@ -54,6 +54,8 @@ interface GearManagementProps {
   onUnequipAll: () => void;
   onMergeStats: () => void;
   onReverseMergeStats: () => void;
+  onReorderGears: (reorderedGears: Gear[]) => void;
+  onReorderOtherStats: (reorderedOtherStats: OtherStat[]) => void;
   presets: Preset[];
   onSavePreset: (name: string) => void;
   onLoadPreset: (presetId: string) => void;
@@ -136,6 +138,8 @@ const GearManagement: React.FC<GearManagementProps> = ({
   onUnequipAll,
   onMergeStats,
   onReverseMergeStats,
+  onReorderGears,
+  onReorderOtherStats,
   presets,
   onSavePreset,
   onLoadPreset,
@@ -154,6 +158,16 @@ const GearManagement: React.FC<GearManagementProps> = ({
   const [editingStat, setEditingStat] = useState<string | null>(null);
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [presetNameInput, setPresetNameInput] = useState('');
+
+  // Drag-and-drop state for gear items in slot modal
+  const [draggedGearId, setDraggedGearId] = useState<string | null>(null);
+  const [dragOverGearId, setDragOverGearId] = useState<string | null>(null);
+  const dragNodeRef = useRef<HTMLDivElement | null>(null);
+
+  // Drag-and-drop state for other stat items
+  const [draggedOtherStatId, setDraggedOtherStatId] = useState<string | null>(null);
+  const [dragOverOtherStatId, setDragOverOtherStatId] = useState<string | null>(null);
+  const dragOtherStatNodeRef = useRef<HTMLDivElement | null>(null);
 
 
   const handleAddGearForSlot = (slot: GearSlot) => {
@@ -210,6 +224,70 @@ const GearManagement: React.FC<GearManagementProps> = ({
 
   const getGearsForSlot = (slot: GearSlot): Gear[] => {
     return (gears || []).filter((gear: Gear) => gear.slot === slot);
+  };
+
+  // Drag-and-drop handlers for gear items
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, gearId: string) => {
+    setDraggedGearId(gearId);
+    dragNodeRef.current = e.currentTarget as HTMLDivElement;
+    e.dataTransfer.effectAllowed = 'move';
+    // Make the drag image slightly transparent
+    setTimeout(() => {
+      if (dragNodeRef.current) {
+        dragNodeRef.current.classList.add('dragging');
+      }
+    }, 0);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, gearId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedGearId && gearId !== draggedGearId) {
+      setDragOverGearId(gearId);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, gearId: string) => {
+    e.preventDefault();
+    if (draggedGearId && gearId !== draggedGearId) {
+      setDragOverGearId(gearId);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    // Only clear if leaving the actual element (not entering a child)
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (!e.currentTarget.contains(relatedTarget)) {
+      setDragOverGearId(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetGearId: string) => {
+    e.preventDefault();
+    if (!draggedGearId || draggedGearId === targetGearId) return;
+
+    const allGears = [...(gears || [])];
+    const dragIndex = allGears.findIndex(g => g.id === draggedGearId);
+    const targetIndex = allGears.findIndex(g => g.id === targetGearId);
+
+    if (dragIndex === -1 || targetIndex === -1) return;
+
+    // Remove dragged item and insert at target position
+    const [draggedItem] = allGears.splice(dragIndex, 1);
+    allGears.splice(targetIndex, 0, draggedItem);
+
+    onReorderGears(allGears);
+    setDraggedGearId(null);
+    setDragOverGearId(null);
+  };
+
+  const handleDragEnd = () => {
+    if (dragNodeRef.current) {
+      dragNodeRef.current.classList.remove('dragging');
+    }
+    setDraggedGearId(null);
+    setDragOverGearId(null);
+    dragNodeRef.current = null;
   };
 
   const getBaseDisplayValue = (key: string): string => {
@@ -379,13 +457,22 @@ const GearManagement: React.FC<GearManagementProps> = ({
                   onClick={() => handleSlotClick(slot)}
                 >
                   <div className="slot-icon">
-                    {hasAnyGear ? '⚔️' : '📦'}
+                    {baseGear?.image ? (
+                      <img src={baseGear.image} alt={baseGear.name} className="slot-gear-icon" />
+                    ) : secondaryGear?.image ? (
+                      <img src={secondaryGear.image} alt={secondaryGear.name} className="slot-gear-icon" />
+                    ) : (
+                      hasAnyGear ? '⚔️' : '📦'
+                    )}
                   </div>
                   <div className="slot-info">
                     <div className="slot-name">{slotLabels[slot]}</div>
                     <div className="slot-sub-slots">
                       <div className={`sub-slot-line ${baseGear ? 'filled' : ''}`}>
                         <span className="sub-slot-label">B</span>
+                        {baseGear?.image && (
+                          <img src={baseGear.image} alt="" className="sub-slot-icon" />
+                        )}
                         <span className="sub-slot-gear-name" title={baseGear ? baseGear.name : 'Empty'}>
                           {baseGear ? baseGear.name : 'Empty'}
                         </span>
@@ -404,6 +491,9 @@ const GearManagement: React.FC<GearManagementProps> = ({
                       </div>
                       <div className={`sub-slot-line ${secondaryGear ? 'filled' : ''}`}>
                         <span className="sub-slot-label">S</span>
+                        {secondaryGear?.image && (
+                          <img src={secondaryGear.image} alt="" className="sub-slot-icon" />
+                        )}
                         <span className="sub-slot-gear-name" title={secondaryGear ? secondaryGear.name : 'Empty'}>
                           {secondaryGear ? secondaryGear.name : 'Empty'}
                         </span>
@@ -662,7 +752,65 @@ const GearManagement: React.FC<GearManagementProps> = ({
                     ));
 
                   return (
-                    <div key={otherStat.id} className={`slot-gear-item ${isEquipped ? 'equipped' : ''}`} style={{ position: 'relative' }}>
+                    <div
+                      key={otherStat.id}
+                      className={`slot-gear-item ${isEquipped ? 'equipped' : ''} ${draggedOtherStatId === otherStat.id ? 'dragging' : ''} ${dragOverOtherStatId === otherStat.id ? 'drag-over' : ''}`}
+                      style={{ position: 'relative' }}
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedOtherStatId(otherStat.id);
+                        dragOtherStatNodeRef.current = e.currentTarget as HTMLDivElement;
+                        e.dataTransfer.effectAllowed = 'move';
+                        setTimeout(() => {
+                          if (dragOtherStatNodeRef.current) {
+                            dragOtherStatNodeRef.current.classList.add('dragging');
+                          }
+                        }, 0);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (draggedOtherStatId && otherStat.id !== draggedOtherStatId) {
+                          setDragOverOtherStatId(otherStat.id);
+                        }
+                      }}
+                      onDragEnter={(e) => {
+                        e.preventDefault();
+                        if (draggedOtherStatId && otherStat.id !== draggedOtherStatId) {
+                          setDragOverOtherStatId(otherStat.id);
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        const relatedTarget = e.relatedTarget as HTMLElement;
+                        if (!e.currentTarget.contains(relatedTarget)) {
+                          setDragOverOtherStatId(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (!draggedOtherStatId || draggedOtherStatId === otherStat.id) return;
+                        const all = [...(otherStats || [])];
+                        const dragIdx = all.findIndex(s => s.id === draggedOtherStatId);
+                        const targetIdx = all.findIndex(s => s.id === otherStat.id);
+                        if (dragIdx === -1 || targetIdx === -1) return;
+                        const [dragged] = all.splice(dragIdx, 1);
+                        all.splice(targetIdx, 0, dragged);
+                        onReorderOtherStats(all);
+                        setDraggedOtherStatId(null);
+                        setDragOverOtherStatId(null);
+                      }}
+                      onDragEnd={() => {
+                        if (dragOtherStatNodeRef.current) {
+                          dragOtherStatNodeRef.current.classList.remove('dragging');
+                        }
+                        setDraggedOtherStatId(null);
+                        setDragOverOtherStatId(null);
+                        dragOtherStatNodeRef.current = null;
+                      }}
+                    >
+                      <div className="drag-handle" title="Drag to reorder">
+                        <FaGripVertical size={14} />
+                      </div>
                       <div className="item-actions-top">
                         <button
                           className="minimal-action-btn edit"
@@ -698,37 +846,40 @@ const GearManagement: React.FC<GearManagementProps> = ({
                         {isInBase && <span className="slot-equipped-badge" style={{ background: '#0891b2' }}>BASE</span>}
                         {isInSecondary && <span className="slot-equipped-badge" style={{ background: '#9333ea' }}>SECONDARY</span>}
                       </div>
-                      <div className="slot-gear-stats">
-                        {statsList.length > 0 ? statsList : (
-                          <div className="gear-stat-item">No stats added</div>
-                        )}
-                      </div>
-                      <div className="slot-gear-actions">
-                        {otherStat.isSetEffect ? (
-                          <div className="set-effect-auto-badge">SET EFFECT (AUTO)</div>
-                        ) : isEquipped ? (
-                          <button
-                            className="slot-gear-btn unequip-btn"
-                            onClick={() => onUnequipOtherStat(otherStat.id)}
-                          >
-                            Unequip ({isInBase ? 'Base' : 'Secondary'})
-                          </button>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '6px' }}>
+                      {/* Hover overlay: stats + actions */}
+                      <div className="slot-gear-hover-content">
+                        <div className="slot-gear-stats-hover">
+                          {statsList.length > 0 ? statsList : (
+                            <div className="gear-stat-item">No stats added</div>
+                          )}
+                        </div>
+                        <div className="slot-gear-actions">
+                          {otherStat.isSetEffect ? (
+                            <div className="set-effect-auto-badge">SET EFFECT (AUTO)</div>
+                          ) : isEquipped ? (
                             <button
-                              className="slot-gear-btn equip-base-btn"
-                              onClick={() => onEquipOtherStat(otherStat.id, 'base')}
+                              className="slot-gear-btn unequip-btn"
+                              onClick={() => onUnequipOtherStat(otherStat.id)}
                             >
-                              Equip Base
+                              Unequip ({isInBase ? 'Base' : 'Secondary'})
                             </button>
-                            <button
-                              className="slot-gear-btn equip-secondary-btn"
-                              onClick={() => onEquipOtherStat(otherStat.id, 'secondary')}
-                            >
-                              Equip Secondary
-                            </button>
-                          </div>
-                        )}
+                          ) : (
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button
+                                className="slot-gear-btn equip-base-btn"
+                                onClick={() => onEquipOtherStat(otherStat.id, 'base')}
+                              >
+                                Equip Base
+                              </button>
+                              <button
+                                className="slot-gear-btn equip-secondary-btn"
+                                onClick={() => onEquipOtherStat(otherStat.id, 'secondary')}
+                              >
+                                Equip Secondary
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -818,7 +969,21 @@ const GearManagement: React.FC<GearManagementProps> = ({
                       ));
 
                     return (
-                      <div key={gear.id} className={`slot-gear-item ${isEquipped ? 'equipped' : ''}`} style={{ position: 'relative' }}>
+                      <div
+                        key={gear.id}
+                        className={`slot-gear-item ${isEquipped ? 'equipped' : ''} ${draggedGearId === gear.id ? 'dragging' : ''} ${dragOverGearId === gear.id ? 'drag-over' : ''}`}
+                        style={{ position: 'relative' }}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, gear.id)}
+                        onDragOver={(e) => handleDragOver(e, gear.id)}
+                        onDragEnter={(e) => handleDragEnter(e, gear.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, gear.id)}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <div className="drag-handle" title="Drag to reorder">
+                          <FaGripVertical size={14} />
+                        </div>
                         <div className="item-actions-top">
                           <button
                             className="minimal-action-btn edit"
@@ -850,7 +1015,11 @@ const GearManagement: React.FC<GearManagementProps> = ({
                             <FaTrash size={14} />
                           </button>
                         </div>
+                        {/* Compact: icon + name */}
                         <div className="slot-gear-header">
+                          {gear.image && (
+                            <img src={gear.image} alt="" className="slot-gear-item-icon" />
+                          )}
                           <span className="slot-gear-name">{gear.name}</span>
                           {isEquipped && (
                             <span className="slot-equipped-badge">
@@ -858,35 +1027,38 @@ const GearManagement: React.FC<GearManagementProps> = ({
                             </span>
                           )}
                         </div>
-                        <div className="slot-gear-stats">
-                          {statsList.length > 0 ? statsList : (
-                            <div className="gear-stat-item">No stats added</div>
-                          )}
-                        </div>
-                        <div className="slot-gear-actions dual-slot-actions">
-                          {isEquipped ? (
-                            <button
-                              className="slot-gear-btn unequip-btn"
-                              onClick={() => onUnequipGear(gear.id)}
-                            >
-                              Unequip ({subSlot === 'base' ? 'Base' : 'Secondary'})
-                            </button>
-                          ) : (
-                            <>
+                        {/* Hover overlay: stats + actions */}
+                        <div className="slot-gear-hover-content">
+                          <div className="slot-gear-stats-hover">
+                            {statsList.length > 0 ? statsList : (
+                              <div className="gear-stat-item">No stats added</div>
+                            )}
+                          </div>
+                          <div className="slot-gear-actions dual-slot-actions">
+                            {isEquipped ? (
                               <button
-                                className="slot-gear-btn equip-base-btn"
-                                onClick={() => onEquipGear(gear.id, 'base')}
+                                className="slot-gear-btn unequip-btn"
+                                onClick={() => onUnequipGear(gear.id)}
                               >
-                                Equip Base
+                                Unequip ({subSlot === 'base' ? 'Base' : 'Secondary'})
                               </button>
-                              <button
-                                className="slot-gear-btn equip-secondary-btn"
-                                onClick={() => onEquipGear(gear.id, 'secondary')}
-                              >
-                                Equip Secondary
-                              </button>
-                            </>
-                          )}
+                            ) : (
+                              <>
+                                <button
+                                  className="slot-gear-btn equip-base-btn"
+                                  onClick={() => onEquipGear(gear.id, 'base')}
+                                >
+                                  Equip Base
+                                </button>
+                                <button
+                                  className="slot-gear-btn equip-secondary-btn"
+                                  onClick={() => onEquipGear(gear.id, 'secondary')}
+                                >
+                                  Equip Secondary
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );

@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 
 import './DamageCalculator.css';
 import GearManagement from './components/GearManagement';
 import StickyFooter from './components/StickyFooter';
 import CustomDialog from './components/CustomDialog';
+import SplashScreen from './components/SplashScreen';
 import type { CalculatorInputs, Gear, GearSlot, OtherStat, Preset, DialogConfig, EquippedGearSlots, EquippedOtherStatSlots } from './types';
 import { BASE_STAT_KEYS, getAllEquippedGearIds } from './types';
 
@@ -82,6 +83,11 @@ function App() {
   });
 
   const [resonanceActive, setResonanceActive] = useLocalStorage('resonanceActive', false);
+  const [showSplash, setShowSplash] = useState(true);
+
+  const handleSplashComplete = useCallback(() => {
+    setShowSplash(false);
+  }, []);
   const [gears, setGears] = useLocalStorage<Gear[]>('gears', []);
   const [equippedGears, setEquippedGears] = useLocalStorage<EquippedGearSlots>('equippedGears', {});
   const [otherStats, setOtherStats] = useLocalStorage<OtherStat[]>('otherStats', []);
@@ -244,7 +250,7 @@ function App() {
 
   const handleExportData = () => {
     const exportData = {
-      version: '3.1', // Bump version for userModifiers support
+      version: '3.2', // Bump version for gear images and item ordering
       exportDate: new Date().toISOString(),
       calculatorInputs: inputs,
       resonanceActive,
@@ -405,6 +411,14 @@ function App() {
     }
     setGears(gears.filter(gear => gear.id !== gearId));
     setActivePresetId(null);
+  };
+
+  const handleReorderGears = (reorderedGears: Gear[]) => {
+    setGears(reorderedGears);
+  };
+
+  const handleReorderOtherStats = (reorderedOtherStats: OtherStat[]) => {
+    setOtherStats(reorderedOtherStats);
   };
 
   const handleEquipGear = (gearId: string, subSlot: 'base' | 'secondary') => {
@@ -956,56 +970,60 @@ function App() {
   }, [equippedGears, gears, equippedOtherStats, otherStats, userModifiers, setInputs]);
 
   return (
-    <div className="container">
-      <h1>CoA Damage Calculator</h1>
+    <>
+      {showSplash && <SplashScreen onComplete={handleSplashComplete} duration={3000} />}
+      <div className="container">
 
-      <GearManagement
-        gears={gears}
-        equippedGears={equippedGears}
-        otherStats={otherStats}
-        equippedOtherStats={equippedOtherStats}
-        gearBaseContributions={gearBaseContributions}
-        onAddGear={handleAddGear}
-        onEditGear={handleEditGear}
-        onDeleteGear={handleDeleteGear}
-        onEquipGear={handleEquipGear}
-        onUnequipGear={handleUnequipGear}
-        onAddOtherStat={handleAddOtherStat}
-        onEditOtherStat={handleEditOtherStat}
-        onDeleteOtherStat={handleDeleteOtherStat}
-        onEquipOtherStat={handleEquipOtherStat}
-        onUnequipOtherStat={handleUnequipOtherStat}
-        onUnequipAllOtherStats={handleUnequipAllOtherStats}
-        inputs={inputs}
-        totalValues={totalValues}
-        onInputChange={handleInputChange}
-        results={results}
-        onResetDefaults={handleResetDefaults}
-        onResetModifiers={handleResetModifiers}
-        onImportData={handleImportData}
-        onExportData={handleExportData}
-        resonanceActive={resonanceActive}
-        onResonanceToggle={handleResonanceToggle}
-        onUnequipAll={handleUnequipAll}
-        onMergeStats={handleMergeStats}
-        onReverseMergeStats={handleReverseMergeStats}
-        presets={presets}
-        onSavePreset={handleSavePreset}
-        onLoadPreset={handleLoadPreset}
-        onDeletePreset={handleDeletePreset}
-        activePresetId={activePresetId}
-        showDialog={showDialog}
-      />
+        <GearManagement
+          gears={gears}
+          equippedGears={equippedGears}
+          otherStats={otherStats}
+          equippedOtherStats={equippedOtherStats}
+          gearBaseContributions={gearBaseContributions}
+          onAddGear={handleAddGear}
+          onEditGear={handleEditGear}
+          onDeleteGear={handleDeleteGear}
+          onEquipGear={handleEquipGear}
+          onUnequipGear={handleUnequipGear}
+          onAddOtherStat={handleAddOtherStat}
+          onEditOtherStat={handleEditOtherStat}
+          onDeleteOtherStat={handleDeleteOtherStat}
+          onEquipOtherStat={handleEquipOtherStat}
+          onUnequipOtherStat={handleUnequipOtherStat}
+          onUnequipAllOtherStats={handleUnequipAllOtherStats}
+          inputs={inputs}
+          totalValues={totalValues}
+          onInputChange={handleInputChange}
+          results={results}
+          onResetDefaults={handleResetDefaults}
+          onResetModifiers={handleResetModifiers}
+          onImportData={handleImportData}
+          onExportData={handleExportData}
+          resonanceActive={resonanceActive}
+          onResonanceToggle={handleResonanceToggle}
+          onUnequipAll={handleUnequipAll}
+          onMergeStats={handleMergeStats}
+          onReverseMergeStats={handleReverseMergeStats}
+          onReorderGears={handleReorderGears}
+          onReorderOtherStats={handleReorderOtherStats}
+          presets={presets}
+          onSavePreset={handleSavePreset}
+          onLoadPreset={handleLoadPreset}
+          onDeletePreset={handleDeletePreset}
+          activePresetId={activePresetId}
+          showDialog={showDialog}
+        />
 
-      <CustomDialog config={dialog} onClose={closeDialog} />
+        <CustomDialog config={dialog} onClose={closeDialog} />
 
-      <StickyFooter
-        baseDamage={results.baseDamage}
-        finalDamage={results.finalDamage}
-        hasModifiers={results.hasModifiers}
-        percentageIncrease={results.percentageIncrease}
-      />
-    </div>
+        <StickyFooter
+          baseDamage={results.baseDamage}
+          finalDamage={results.finalDamage}
+          hasModifiers={results.hasModifiers}
+          percentageIncrease={results.percentageIncrease}
+        />
+      </div>
+    </>
   );
 }
 

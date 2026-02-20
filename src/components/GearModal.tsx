@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Gear, GearStats, GearSlot } from '../types';
 
 interface GearModalProps {
@@ -64,6 +64,38 @@ const statLabels: Record<string, string> = {
   'additionalDmg': 'Additional DMG (%)'
 };
 
+/**
+ * Resizes an image file to 50x50 and returns a base64 data URL.
+ */
+const resizeImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 75;
+        canvas.height = 75;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        // Draw image scaled to 75x75, maintaining aspect ratio via cover
+        const size = Math.min(img.width, img.height);
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 75, 75);
+        resolve(canvas.toDataURL('image/webp', 0.8));
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+};
+
 const GearModal: React.FC<GearModalProps> = ({
   isOpen,
   onClose,
@@ -75,12 +107,15 @@ const GearModal: React.FC<GearModalProps> = ({
   const [gearSlot, setGearSlot] = useState<GearSlot>('helmet');
   const [stats, setStats] = useState<GearStats>({});
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
+  const [gearImage, setGearImage] = useState<string | undefined>(undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editingGear) {
       setGearName(editingGear.name);
       setGearSlot(editingGear.slot);
       setStats(editingGear.stats);
+      setGearImage(editingGear.image);
       // Initialize input values from stats
       const initialInputs: Record<string, string> = {};
       Object.entries(editingGear.stats).forEach(([key, value]) => {
@@ -93,8 +128,28 @@ const GearModal: React.FC<GearModalProps> = ({
       setGearSlot(preselectedSlot || 'helmet');
       setStats({});
       setInputValues({});
+      setGearImage(undefined);
     }
   }, [editingGear, preselectedSlot]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    try {
+      const resized = await resizeImage(file);
+      setGearImage(resized);
+    } catch (err) {
+      console.error('Image resize failed:', err);
+      alert('Failed to process image');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,13 +162,15 @@ const GearModal: React.FC<GearModalProps> = ({
     onSave({
       name: gearName.trim(),
       slot: gearSlot,
-      stats
+      stats,
+      image: gearImage
     });
 
     setGearName('');
     setGearSlot('helmet');
     setStats({});
     setInputValues({});
+    setGearImage(undefined);
   };
 
   const handleStatChange = (stat: string, value: number) => {
@@ -142,83 +199,117 @@ const GearModal: React.FC<GearModalProps> = ({
         </div>
         <form id="gearForm" onSubmit={handleSubmit}>
           <div className="modal-scroll-content">
-            <div className="gear-form-group">
-              <label htmlFor="gearName">Gear Name *</label>
-            <input
-              type="text"
-              id="gearName"
-              value={gearName}
-              onChange={(e) => setGearName(e.target.value)}
-              required
-              placeholder="e.g., Legendary Sword"
-            />
-          </div>
-          <div className="gear-form-group">
-            <label htmlFor="gearSlot">Slot Type *</label>
-            <select
-              id="gearSlot"
-              value={gearSlot}
-              onChange={(e) => setGearSlot(e.target.value as GearSlot)}
-              required
-              className="gear-slot-select"
-              disabled={!!preselectedSlot}
-            >
-              {gearSlots.map(slot => (
-                <option key={slot} value={slot}>
-                  {slotLabels[slot]}
-                </option>
-              ))}
-            </select>
-            {preselectedSlot && (
-              <small style={{ color: 'var(--text-secondary)', fontSize: '0.8em', marginTop: '4px', display: 'block' }}>
-                Slot type is set based on the selected slot
-              </small>
-            )}
-          </div>
-          <div className="gear-form-group">
-            <label>Gear Stats (leave 0 if not applicable)</label>
-            <div className="gear-stats-grid">
-              {gearStatsList.map(stat => (
-                <div key={stat} className="stat-input-group">
-                  <label htmlFor={`gear_${stat}`}>{statLabels[stat]}</label>
-                  <input
-                    type="number"
-                    id={`gear_${stat}`}
-                    value={inputValues[stat] ?? (stats[stat as keyof GearStats] !== undefined && stats[stat as keyof GearStats] !== null ? stats[stat as keyof GearStats]!.toString() : '')}
-                    onChange={(e) => {
-                      const inputValue = e.target.value;
-                      // Update input value immediately for responsive typing
-                      setInputValues({
-                        ...inputValues,
-                        [stat]: inputValue
-                      });
-
-                      if (inputValue === '' || inputValue === '-') {
-                        // Allow empty or just minus sign while typing
-                        const newStats = { ...stats };
-                        delete newStats[stat as keyof GearStats];
-                        setStats(newStats);
-                        return;
-                      }
-
-                      const numValue = parseFloat(inputValue);
-                      if (!isNaN(numValue)) {
-                        // Save the value (negative values are allowed)
-                        handleStatChange(stat, numValue);
-                        // Clear the input value since we're storing it in stats
-                        const newInputValues = { ...inputValues };
-                        delete newInputValues[stat];
-                        setInputValues(newInputValues);
-                      }
+            {/* Image upload + name row */}
+            <div className="gear-form-row">
+              <div className="gear-image-upload" onClick={() => fileInputRef.current?.click()}>
+                {gearImage ? (
+                  <img src={gearImage} alt="Gear" className="gear-image-preview" />
+                ) : (
+                  <div className="gear-image-placeholder">
+                    <span className="gear-image-plus">+</span>
+                    <span className="gear-image-label">Icon</span>
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  style={{ display: 'none' }}
+                />
+                {gearImage && (
+                  <button
+                    type="button"
+                    className="gear-image-remove"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGearImage(undefined);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
                     }}
-                    step="any"
-                    placeholder="0"
-                    onWheel={(e) => (e.target as HTMLElement).blur()}
-                  />
-                </div>
-              ))}
+                    title="Remove image"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <div className="gear-form-group" style={{ flex: 1 }}>
+                <label htmlFor="gearName">Gear Name *</label>
+                <input
+                  type="text"
+                  id="gearName"
+                  value={gearName}
+                  onChange={(e) => setGearName(e.target.value)}
+                  required
+                  placeholder="e.g., Legendary Sword"
+                />
+              </div>
             </div>
-          </div>
+            <div className="gear-form-group">
+              <label htmlFor="gearSlot">Slot Type *</label>
+              <select
+                id="gearSlot"
+                value={gearSlot}
+                onChange={(e) => setGearSlot(e.target.value as GearSlot)}
+                required
+                className="gear-slot-select"
+                disabled={!!preselectedSlot}
+              >
+                {gearSlots.map(slot => (
+                  <option key={slot} value={slot}>
+                    {slotLabels[slot]}
+                  </option>
+                ))}
+              </select>
+              {preselectedSlot && (
+                <small style={{ color: 'var(--text-secondary)', fontSize: '0.8em', marginTop: '4px', display: 'block' }}>
+                  Slot type is set based on the selected slot
+                </small>
+              )}
+            </div>
+            <div className="gear-form-group">
+              <label>Gear Stats (leave 0 if not applicable)</label>
+              <div className="gear-stats-grid">
+                {gearStatsList.map(stat => (
+                  <div key={stat} className="stat-input-group">
+                    <label htmlFor={`gear_${stat}`}>{statLabels[stat]}</label>
+                    <input
+                      type="number"
+                      id={`gear_${stat}`}
+                      value={inputValues[stat] ?? (stats[stat as keyof GearStats] !== undefined && stats[stat as keyof GearStats] !== null ? stats[stat as keyof GearStats]!.toString() : '')}
+                      onChange={(e) => {
+                        const inputValue = e.target.value;
+                        // Update input value immediately for responsive typing
+                        setInputValues({
+                          ...inputValues,
+                          [stat]: inputValue
+                        });
+
+                        if (inputValue === '' || inputValue === '-') {
+                          // Allow empty or just minus sign while typing
+                          const newStats = { ...stats };
+                          delete newStats[stat as keyof GearStats];
+                          setStats(newStats);
+                          return;
+                        }
+
+                        const numValue = parseFloat(inputValue);
+                        if (!isNaN(numValue)) {
+                          // Save the value (negative values are allowed)
+                          handleStatChange(stat, numValue);
+                          // Clear the input value since we're storing it in stats
+                          const newInputValues = { ...inputValues };
+                          delete newInputValues[stat];
+                          setInputValues(newInputValues);
+                        }
+                      }}
+                      step="any"
+                      placeholder="0"
+                      onWheel={(e) => (e.target as HTMLElement).blur()}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="modal-actions">
             <button type="button" className="modal-btn cancel-btn" onClick={onClose}>

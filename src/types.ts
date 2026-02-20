@@ -71,6 +71,7 @@ export interface Gear {
   name: string;
   slot: GearSlot;
   stats: GearStats;
+  image?: string;
 }
 
 export interface OtherStat {
