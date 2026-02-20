@@ -567,10 +567,33 @@ const GearManagement: React.FC<GearManagementProps> = ({
                   <button className="import-btn" onClick={onImportData} title="Import Data"><FaFileImport size={16} /></button>
                   <button className="export-btn" onClick={onExportData} title="Export Data"><FaFileExport size={16} /></button>
                 </div>
-                <div className="actual-attack-header">
-                  <h3>Actual Attack</h3>
-                  <div className="actual-attack-value">{Math.round(results.actualAttack).toLocaleString()}</div>
-                  <div className="actual-attack-formula">= Total ATK × (1 - Damage Reduction %) + DEF Shred</div>
+                <div className="actual-attack-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3>Actual Attack</h3>
+                    <div className="actual-attack-value">{Math.round(results.actualAttack).toLocaleString()}</div>
+                    <div className="actual-attack-formula">= Total ATK × (1 - Damage Reduction %) + DEF Shred</div>
+                  </div>
+
+                  <div className="damage-display" style={{ margin: 0 }}>
+                    <div className="damage-item">
+                      <span className="damage-label">Base Damage</span>
+                      <span className="damage-value" style={{ fontSize: '1rem' }}>{Math.round(results.baseDamage).toLocaleString()}</span>
+                    </div>
+                    {results.hasModifiers && (
+                      <>
+                        <span className="damage-arrow">→</span>
+                        <div className="damage-item">
+                          <span className="damage-label">Final Damage</span>
+                          <span className={`damage-value final ${results.percentageIncrease < 0 ? 'decrease' : ''}`} style={{ fontSize: '1.2rem' }}>
+                            {Math.round(results.finalDamage).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className={`damage-increase ${results.percentageIncrease >= 0 ? 'increase' : 'decrease'}`} style={{ fontSize: '0.8rem', padding: '2px 8px' }}>
+                          {results.percentageIncrease >= 0 ? '+' : ''}{formatStatValue(results.percentageIncrease)}%
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="stats-display-content">

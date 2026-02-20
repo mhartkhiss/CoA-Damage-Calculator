@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 
 import './DamageCalculator.css';
 import GearManagement from './components/GearManagement';
-import StickyFooter from './components/StickyFooter';
+
 import CustomDialog from './components/CustomDialog';
 import SplashScreen from './components/SplashScreen';
 import type { CalculatorInputs, Gear, GearSlot, OtherStat, Preset, DialogConfig, EquippedGearSlots, EquippedOtherStatSlots } from './types';
@@ -1037,12 +1037,7 @@ function App() {
 
         <CustomDialog config={dialog} onClose={closeDialog} />
 
-        <StickyFooter
-          baseDamage={results.baseDamage}
-          finalDamage={results.finalDamage}
-          hasModifiers={results.hasModifiers}
-          percentageIncrease={results.percentageIncrease}
-        />
+
       </div>
     </>
   );

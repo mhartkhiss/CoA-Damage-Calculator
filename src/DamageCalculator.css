@@ -135,7 +135,7 @@ body {
   max-width: 1800px;
   margin: 0 auto;
   padding: 8px 24px;
-  height: calc(100vh - 80px);
+  height: 100vh;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -477,29 +477,15 @@ input[type="number"].modifier-input {
   justify-content: flex-end;
 }
 
-.sticky-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(15, 23, 42, 0.9);
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
-  padding: 8px 16px;
-  /* Reduced from 16px 24px */
-  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  border-top: 1px solid var(--border-subtle);
-}
-
 .damage-display {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   align-items: center;
-  gap: 20px;
-  /* Reduced gap */
-  max-width: 1200px;
-  margin: 0 auto;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
 }
 
 .damage-item {
@@ -781,9 +767,6 @@ button:active {
     margin-bottom: 12px;
   }
 
-  .sticky-footer {
-    padding: 10px 12px;
-  }
 
   .damage-display {
     gap: 12px;
