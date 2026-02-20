@@ -1323,8 +1323,7 @@ button:active {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   width: 100%;
 }
 
@@ -1346,12 +1345,14 @@ button:active {
 .slot-grid {
   display: grid;
   grid-template-columns: 1fr 3fr 1fr;
-  grid-template-rows: auto auto auto auto auto auto;
+  grid-template-rows: repeat(6, auto);
   gap: 6px;
   margin-bottom: 0;
   width: 100%;
   margin-left: 0;
   margin-right: 0;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Gear layout positioning: Left side, Center stats, and Right side */
@@ -1445,7 +1446,6 @@ button:active {
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
-  flex: 1;
 }
 
 .stats-display-header {
