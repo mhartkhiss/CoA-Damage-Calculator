@@ -519,7 +519,7 @@ const GearManagement: React.FC<GearManagementProps> = ({
                   </div>
 
                   {/* Hover UI */}
-                  <div className="slot-hover-dropdown">
+                  <div className="slot-hover-dropdown" onClick={(e) => e.stopPropagation()}>
                     <div className="hover-dropdown-header">{slotLabels[slot]} Gears</div>
                     <div className="hover-dropdown-list">
                       {gears.filter(g => g.slot === slot).length === 0 ? (
